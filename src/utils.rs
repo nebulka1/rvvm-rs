@@ -9,10 +9,14 @@ use crate::error::CCharsCreateFailure;
 #[macro_export]
 macro_rules! c_str {
     ($lit:literal) => {{
-        let concatenated = concat!($lit, b"\0");
+        let concatenated = concat!($lit, "\0");
         // SAFETY: this is safe since requirements are due to line
         // above
-        unsafe { $crate::utils::CChars::new_unchecked(concatenated) }
+        unsafe {
+            $crate::utils::CChars::new_unchecked(
+                concatenated.as_bytes() as &[u8]
+            )
+        }
     }};
 }
 
