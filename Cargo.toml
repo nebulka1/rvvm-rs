@@ -3,10 +3,14 @@ name = "rvvm"
 version = "0.2.1"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+readme = "README.md"
+license-file = "LICENSE"
 
 [workspace]
 members = ["packages/*"]
 
 [dependencies]
-rvvm-sys = { path = "packages/rvvm-sys" }
+integral-enum = "1.2.1"
+thiserror = "1.0.38"
+
+rvvm-sys = { version = "0.1.0", path = "packages/rvvm-sys" }
