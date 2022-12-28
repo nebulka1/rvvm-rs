@@ -33,7 +33,6 @@ type RwCallback = unsafe extern "C" fn(
     size: u8,
 ) -> bool;
 
-// FIXME: Make Option<RwCallback> available
 #[repr(transparent)]
 pub struct MmioHandler(pub(crate) Option<RwCallback>);
 
@@ -138,9 +137,9 @@ impl<'a, T> Drop for DeviceDescriptorGlue<'a, T> {
     fn drop(&mut self) {
         let dev = self.inner.inner.as_ptr();
 
-        // // SAFETY: this is safe since `inner.inner` is
-        // NonNull and // well-allocated. guarantees
-        // by // `DeviceDescriptor<T>`
+        // SAFETY: this is safe since `inner.inner` is
+        // NonNull and well-allocated. guarantees
+        // by `DeviceDescriptor<T>`
         unsafe { utils::free_and_drop_dev_internals::<T>(dev) }
     }
 }

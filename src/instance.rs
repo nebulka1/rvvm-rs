@@ -27,7 +27,6 @@ pub struct Instance {
 }
 
 impl Instance {
-    // FIXME: add device handle wrapper
     pub fn attach_device<T>(
         &mut self,
         device: DeviceDescriptorGlue<'_, T>,
