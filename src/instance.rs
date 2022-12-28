@@ -1,18 +1,62 @@
-use std::ptr::NonNull;
+use std::{
+    mem::ManuallyDrop,
+    ptr::NonNull,
+};
 
 use rvvm_sys::{
+    rvvm_attach_mmio,
     rvvm_create_machine,
     rvvm_free_machine,
     rvvm_machine_t,
+    RVVM_DEFAULT_MEMBASE,
 };
 
-use crate::error::InstanceCreateError;
+use crate::{
+    dev::{
+        handle::DeviceHandle,
+        mmio::DeviceDescriptorGlue,
+    },
+    error::{
+        DeviceAttachError,
+        InstanceCreateError,
+    },
+};
 
 pub struct Instance {
     inner: NonNull<rvvm_machine_t>,
 }
 
 impl Instance {
+    // FIXME: add device handle wrapper
+    pub fn attach_device<T>(
+        &mut self,
+        device: DeviceDescriptorGlue<'_, T>,
+    ) -> Result<DeviceHandle, DeviceAttachError> {
+        // This is required to transfer ownership of the device to
+        // the RVVM internals
+
+        let mut device = ManuallyDrop::new(device);
+        device.write_machine(self.inner);
+        let result = unsafe {
+            rvvm_attach_mmio(self.inner.as_ptr(), device.inner.as_ptr())
+        };
+
+        if result >= 0 {
+            // SAFETY: this is safe since DeviceDescriptor's resources
+            // now is owned by RVVM internals.
+            unsafe { DeviceDescriptorGlue::move_out(device) };
+            Ok(DeviceHandle(result))
+        } else {
+            // required to drop if device if error
+            let _ = ManuallyDrop::into_inner(device);
+            Err(DeviceAttachError::DeviceIsOverlapped)
+        }
+    }
+}
+
+impl Instance {
+    pub const DEFAULT_BASE_ADDRESS: u64 = RVVM_DEFAULT_MEMBASE as u64;
+
     pub fn new(
         base_address: u64,
         ram_size: usize,

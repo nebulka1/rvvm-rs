@@ -4,6 +4,8 @@ use std::{
     ptr::NonNull,
 };
 
+use rvvm_sys::rvvm_mmio_dev_t;
+
 use crate::error::CCharsCreateFailure;
 
 #[macro_export]
@@ -83,6 +85,46 @@ impl<'a> CChars<'a> {
             phantom: PhantomData,
         }
     }
+}
+
+/// # Safety
+///
+/// If ptr points to invalid allocated data action
+/// considered UB. For example: ptr is not allocated through
+/// `libc::malloc`
+pub(crate) unsafe fn free_and_drop_voidptr<T>(
+    data: *mut std::ffi::c_void,
+) {
+    unsafe {
+        std::ptr::drop_in_place::<T>(data as *mut T);
+        if data.is_null() {
+            libc::free(data);
+        }
+    }
+}
+
+/// # Safety
+///
+/// If data points to invalidly allocated data, then
+/// behavior is undefined
+pub(crate) unsafe fn free_and_drop_boxed<T>(data: *mut T) {
+    let _ = unsafe { Box::<T>::from_raw(data) };
+}
+
+/// # Safety
+///
+/// Considered UB if:
+///
+/// - `dev` is invalidly allocated or nullptr
+/// - `dev->data` is invalidly allocated
+/// - `dev->type_` is invalidly allocated or nullptr
+pub(crate) unsafe fn free_and_drop_dev_internals<T>(
+    dev: *mut rvvm_mmio_dev_t,
+) {
+    let dev = &mut *dev;
+
+    free_and_drop_voidptr::<T>(dev.data);
+    free_and_drop_boxed(dev.type_);
 }
 
 #[cold]

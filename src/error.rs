@@ -9,11 +9,24 @@ pub enum InstanceCreateError {
 }
 
 #[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
 pub enum CCharsCreateFailure {
+    #[error("Input has no nul-terminator (\\0)")]
     NoNulTerminator,
 }
 
 #[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
+pub enum DeviceAttachError {
+    #[error(
+        "Device address space overlaps another device's address space"
+    )]
+    DeviceIsOverlapped,
+}
+
+#[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
 pub enum MmioTypeCreateError {
+    #[error("Invalid device name")]
     InvalidName,
 }

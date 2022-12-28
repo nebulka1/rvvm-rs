@@ -6,6 +6,10 @@ edition = "2021"
 readme = "README.md"
 license-file = "LICENSE"
 
+[[bin]]
+name = "rvvmrs"
+path = "bin/main.rs"
+
 [workspace]
 members = ["packages/*"]
 
@@ -14,3 +18,4 @@ integral-enum = "1.2.1"
 thiserror = "1.0.38"
 
 rvvm-sys = { version = "0.1.0", path = "packages/rvvm-sys" }
+libc = { version = "0.2.139", default-features = false }
