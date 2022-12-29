@@ -13,6 +13,9 @@ pub struct DestPtr<'a> {
 
 impl<'a> DestPtr<'a> {
     /// # Safety
+    ///
+    /// This function is unsafe due to possibility of
+    /// producing unbounded lifetimes
     pub unsafe fn new(ptr: *mut c_void, size: u8, offset: usize) -> Self {
         Self {
             ptr,
