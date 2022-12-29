@@ -16,8 +16,8 @@ fn test_mmio_attach() {
         0x1024,
         12,
         1..=1,
-        None,
-        None,
+        MmioHandler::empty(),
+        MmioHandler::empty(),
         (),
         MmioType::new(c_str!("Fucker"), None, None, None),
     );
