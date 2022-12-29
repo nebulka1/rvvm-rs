@@ -2,7 +2,7 @@ use crate::{
     c_str,
     dev::{
         mmio::*,
-        mmio_type::*,
+        type_::*,
     },
     instance::*,
 };

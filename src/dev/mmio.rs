@@ -17,7 +17,7 @@ use rvvm_sys::{
     rvvm_mmio_dev_t,
 };
 
-use super::mmio_type::MmioType;
+use super::type_::MmioType;
 use crate::utils::{
     self,
     cold_path,

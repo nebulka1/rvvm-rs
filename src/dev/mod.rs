@@ -1,4 +1,4 @@
 pub mod mmio;
-pub mod mmio_type;
+pub mod type_;
 
 pub mod handle;
