@@ -1,10 +1,8 @@
 use std::{
     ffi::c_void,
     marker::PhantomData,
-    mem::{
-        ManuallyDrop,
-        MaybeUninit,
-    },
+    mem,
+    mem::ManuallyDrop,
     ops::{
         Deref,
         DerefMut,
@@ -14,7 +12,6 @@ use std::{
     ptr::NonNull,
 };
 
-use libc::malloc;
 use rvvm_sys::{
     rvvm_machine_t,
     rvvm_mmio_dev_t,
@@ -26,15 +23,15 @@ use crate::utils::{
     cold_path,
 };
 
-type RwCallback = unsafe extern "C" fn(
-    dev: *mut rvvm_mmio_dev_t,
+type RwCallback<T> = unsafe extern "C" fn(
+    dev: utils::TypeSafetyWrapper<*mut rvvm_mmio_dev_t, T>,
     dest: *mut c_void,
     offset: usize,
     size: u8,
 ) -> bool;
 
 #[repr(transparent)]
-pub struct MmioHandler(pub(crate) Option<RwCallback>);
+pub struct MmioHandler<T>(pub(crate) Option<RwCallback<T>>);
 
 /// Descriptor of an MMIO device
 pub struct DeviceDescriptor<'a, T = ()> {
@@ -55,58 +52,68 @@ pub struct DeviceDescriptorGlue<'a, T> {
     inner: DeviceDescriptor<'a, T>,
 }
 
-impl<'a, T> DeviceDescriptor<'a, T> {
+impl<'a, T> DeviceDescriptor<'a, T>
+where
+    T: Send + Sync,
+{
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         address: u64,
         size: usize,
         op_size_range: RangeInclusive<u8>,
 
-        read: impl Into<MmioHandler>,
-        write: impl Into<MmioHandler>,
+        read: MmioHandler<T>,
+        write: MmioHandler<T>,
 
         data: T,
         mmio_type: MmioType<'a, T>,
-    ) -> DeviceDescriptorGlue<T> {
-        let (read, write) = (read.into(), write.into());
+    ) -> DeviceDescriptorGlue<'a, T> {
         let allocated_data = 'b: {
             if std::mem::size_of::<T>() == 0 {
                 break 'b ptr::null_mut();
             }
 
-            let mem = unsafe { malloc(std::mem::size_of::<T>()) };
-            {
-                let memref = unsafe { &mut *(mem as *mut MaybeUninit<T>) };
-
-                memref.write(data);
-            }
-
-            mem
+            let mem = unsafe { utils::allocate_libc(data) };
+            mem.as_ptr() as *mut std::ffi::c_void
         };
 
         let type_ptr = Box::into_raw(Box::new(mmio_type.inner));
-        let allocated = Box::new(rvvm_mmio_dev_t {
-            addr: address,
-            size,
-            data: allocated_data,
-            machine: ptr::null_mut(),
-            type_: type_ptr,
-            read: read.0,
-            write: write.0,
-            min_op_size: *op_size_range.start(),
-            max_op_size: *op_size_range.end(),
-        });
+        let allocated = unsafe {
+            utils::allocate_libc(rvvm_mmio_dev_t {
+                addr: address,
+                size,
+                data: allocated_data,
+                machine: ptr::null_mut(),
+                type_: type_ptr,
+
+                // SAFETY: this is safe since TypeSafetyWrapper is marked
+                // as repr(transparent), so it has no
+                // effect on underlying data representation
+                read: mem::transmute(read.0),
+                write: mem::transmute(write.0),
+
+                min_op_size: *op_size_range.start(),
+                max_op_size: *op_size_range.end(),
+            })
+        };
         DeviceDescriptorGlue {
             inner: Self {
-                inner: NonNull::new(Box::into_raw(allocated))
-                    .expect("FIXME: Failed to create box pointer"),
+                inner: allocated,
                 needs_free: true,
                 phantom: PhantomData,
             },
         }
     }
 
-    pub(crate) fn _from_raw_mmio(ptr: *mut rvvm_mmio_dev_t) -> Self {
+    /// # Safety
+    ///
+    /// This function is extremely unsafe due to lack of
+    /// rvvm_mmio_dev_t proper allocation check and due to
+    /// possibility to produce an unbounded lifetime.
+    ///
+    /// So, result is considered UB if ptr was not owned by
+    /// RVVM internals.
+    pub unsafe fn from_raw_mmio(ptr: *mut rvvm_mmio_dev_t) -> Self {
         Self {
             inner: NonNull::new(ptr)
                 .expect("Got nullptr inside from_raw_mmio"),
@@ -175,24 +182,24 @@ impl<'a, T> DerefMut for DeviceDescriptorGlue<'a, T> {
 
 //
 
-impl MmioHandler {
+impl<T> MmioHandler<T> {
     pub const fn empty() -> Self {
         Self(None)
     }
 
-    pub const fn new(handler: RwCallback) -> Self {
+    pub const fn new(handler: RwCallback<T>) -> Self {
         Self(Some(handler))
     }
 }
 
-impl From<Option<RwCallback>> for MmioHandler {
-    fn from(value: Option<RwCallback>) -> Self {
+impl<T> From<Option<RwCallback<T>>> for MmioHandler<T> {
+    fn from(value: Option<RwCallback<T>>) -> Self {
         Self(value)
     }
 }
 
-impl From<RwCallback> for MmioHandler {
-    fn from(value: RwCallback) -> Self {
+impl<T> From<RwCallback<T>> for MmioHandler<T> {
+    fn from(value: RwCallback<T>) -> Self {
         Self::new(value)
     }
 }

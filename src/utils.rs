@@ -1,12 +1,29 @@
 use std::{
     ffi::CStr,
     marker::PhantomData,
+    mem::MaybeUninit,
     ptr::NonNull,
 };
 
 use rvvm_sys::rvvm_mmio_dev_t;
 
 use crate::error::CCharsCreateFailure;
+
+#[repr(transparent)]
+pub struct TypeSafetyWrapper<T, R> {
+    pub(crate) inner: T,
+    pub(crate) phantom: PhantomData<R>,
+}
+
+impl<T, R> TypeSafetyWrapper<T, R> {
+    /// # Safety
+    ///
+    /// This function is internal, so its use outside is
+    /// considered unsafe
+    pub unsafe fn __unwrap(self) -> T {
+        self.inner
+    }
+}
 
 #[macro_export]
 macro_rules! c_str {
@@ -109,6 +126,30 @@ pub(crate) unsafe fn free_and_drop_voidptr<T>(
 /// behavior is undefined
 pub(crate) unsafe fn free_and_drop_boxed<T>(data: *mut T) {
     let _ = unsafe { Box::<T>::from_raw(data) };
+}
+
+/// # Safety
+///
+/// This function is considered unsafe because it must be
+/// used only by internals. Allocating non-repr(C) and ZST
+/// T's are considered UB;
+pub(crate) unsafe fn allocate_libc<T>(data: T) -> NonNull<T> {
+    let mem = libc::malloc(std::mem::size_of::<T>());
+    if mem.is_null() {
+        cold_path();
+        panic!(
+            "Failed to allocate memory for {}",
+            std::any::type_name::<T>()
+        );
+    }
+
+    {
+        let memref = &mut *(mem as *mut MaybeUninit<T>);
+        memref.write(data);
+    }
+
+    // SAFETY: this is safe since we're checked null value above
+    NonNull::new_unchecked(mem as *mut _)
 }
 
 /// # Safety

@@ -30,7 +30,10 @@ impl Instance {
     pub fn attach_device<T>(
         &mut self,
         device: DeviceDescriptorGlue<'_, T>,
-    ) -> Result<DeviceHandle, DeviceAttachError> {
+    ) -> Result<DeviceHandle, DeviceAttachError>
+    where
+        T: Send + Sync,
+    {
         // This is required to transfer ownership of the device to
         // the RVVM internals
 
@@ -40,14 +43,14 @@ impl Instance {
             rvvm_attach_mmio(self.inner.as_ptr(), device.inner.as_ptr())
         };
 
+        // SAFETY: this is safe since DeviceDescriptor's resources
+        // now is owned by RVVM internals or destroyed by the
+        // underlying call to the dev->type->remove.
+        unsafe { DeviceDescriptorGlue::move_out(device) };
+
         if result >= 0 {
-            // SAFETY: this is safe since DeviceDescriptor's resources
-            // now is owned by RVVM internals.
-            unsafe { DeviceDescriptorGlue::move_out(device) };
             Ok(DeviceHandle(result))
         } else {
-            // required to drop if device if error
-            let _ = ManuallyDrop::into_inner(device);
             Err(DeviceAttachError::DeviceIsOverlapped)
         }
     }

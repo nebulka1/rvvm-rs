@@ -18,4 +18,6 @@ integral-enum = "1.2.1"
 thiserror = "1.0.38"
 
 rvvm-sys = { version = "0.1.0", path = "packages/rvvm-sys" }
+rvvm-macro = { version = "0.1.0", path = "packages/rvvm-macro" }
+
 libc = { version = "0.2.139", default-features = false }
