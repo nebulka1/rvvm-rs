@@ -114,7 +114,7 @@ pub(crate) unsafe fn free_and_drop_voidptr<T>(
 ) {
     unsafe {
         std::ptr::drop_in_place::<T>(data as *mut T);
-        if data.is_null() {
+        if !data.is_null() {
             libc::free(data);
         }
     }
