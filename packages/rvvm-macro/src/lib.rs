@@ -56,14 +56,21 @@ pub fn rw_handler(args: TokenStream, stream: TokenStream) -> TokenStream {
                 #block
             }
 
-            let ptr: ::rvvm::dest_ptr::DestPtr<'a> =
-                ::rvvm::dest_ptr::DestPtr::new(
+            let ptr = {
+                type RwEvent<'k> = ::rvvm::rw_event::RwEvent<'k>;
+                RwEvent::<'a>::new(
                     dest,
                     size,
-                    offset
-                );
-            let desc: ::rvvm::dev::mmio::DeviceDescriptor<'a, #ty> =
-                ::rvvm::dev::mmio::DeviceDescriptor::from_raw_mmio(dev);
+                    offset,
+                    ((*dev).size),
+                )
+            };
+
+            let desc = {
+                type DeviceDescriptor<'k> = ::rvvm::dev::mmio::DeviceDescriptor<'k, #ty>;
+                DeviceDescriptor::<'a>::from_raw_mmio(dev)
+            };
+
             inner(
                 desc,
                 ptr
