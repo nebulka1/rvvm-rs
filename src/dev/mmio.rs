@@ -56,6 +56,12 @@ impl<'a, T> DeviceDescriptor<'a, T>
 where
     T: Send + Sync,
 {
+    pub fn data(&self) -> &T {
+        // SAFETY: this is safe since T is `Send + Sync` and
+        // inner != null
+        unsafe { &*(self.inner.as_ref().data as *const T) }
+    }
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         address: u64,
