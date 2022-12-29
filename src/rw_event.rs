@@ -1,4 +1,12 @@
-use std::ffi::c_void;
+use std::{
+    ffi::c_void,
+    ptr,
+};
+
+use crate::{
+    error::MemError,
+    utils::cold_path,
+};
 
 pub struct RwEvent<'a> {
     pub region: &'a mut [u8],
@@ -7,6 +15,32 @@ pub struct RwEvent<'a> {
 }
 
 impl<'a> RwEvent<'a> {
+    pub fn try_write(
+        &mut self,
+        offset: usize,
+        buf: &[u8],
+    ) -> Result<(), MemError> {
+        let start = self
+            .region
+            .get_mut(offset..)
+            .ok_or(MemError::InvalidMemoryRegion)?;
+        if start.len() < buf.len() {
+            cold_path();
+            return Err(MemError::TooLongBuffer);
+        }
+
+        // SAFETY: this is safe since we're checked bounds above
+        unsafe {
+            ptr::copy_nonoverlapping(
+                buf.as_ptr(),
+                start.as_mut_ptr(),
+                buf.len(),
+            )
+        }
+
+        Ok(())
+    }
+
     /// # Safety
     ///
     /// This function is unsafe due to possibility of

@@ -10,6 +10,16 @@ pub enum InstanceCreateError {
 
 #[derive(IntegralEnum, Error)]
 #[enum_disable(display)]
+pub enum MemError {
+    #[error("Invalid memory region specified")]
+    InvalidMemoryRegion,
+
+    #[error("Buffer will overflow specified region")]
+    TooLongBuffer,
+}
+
+#[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
 pub enum CCharsCreateFailure {
     #[error("Input has no nul-terminator (\\0)")]
     NoNulTerminator,
