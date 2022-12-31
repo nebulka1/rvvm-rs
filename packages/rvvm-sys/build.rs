@@ -1,14 +1,20 @@
-use std::env::{self, temp_dir};
-use std::path::PathBuf;
-use std::process::Command;
+use std::{
+    env::{
+        self,
+        temp_dir,
+    },
+    path::PathBuf,
+    process::Command,
+};
 
 const BUILDDIR_SUFFIX: &str = "rvvm-shared";
 const LIB_NAME: &str = "rvvm";
+static RVVM_PATH: &str = "../../misc/rvvm-git";
 
 fn main() {
     let build_dir: PathBuf = temp_dir().join(BUILDDIR_SUFFIX);
 
-    println!("cargo:rerun-if-changed=rvvm-git/src/rvvmlib.h");
+    println!("cargo:rerun-if-changed={RVVM_PATH}/src/rvvmlib.h");
     println!(
         "cargo:rustc-link-search={}",
         build_dir.as_os_str().to_str().unwrap()
@@ -18,7 +24,7 @@ fn main() {
     let status = Command::new("make")
         .arg("lib")
         .env("BUILDDIR", &build_dir)
-        .current_dir("rvvm-git")
+        .current_dir(RVVM_PATH)
         .status()
         .expect("Failed to spawn make command");
     if !status.success() {

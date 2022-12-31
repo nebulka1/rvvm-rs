@@ -1,9 +1,4 @@
-pub mod error;
-pub mod instance;
-
-pub mod dev;
-pub mod rw_event;
-pub mod utils;
+pub mod fdt;
 
 pub use rvvm_sys as ffi;
 
