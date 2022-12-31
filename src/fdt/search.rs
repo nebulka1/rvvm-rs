@@ -10,9 +10,9 @@ use rvvm_sys::{
     fdt_node_find_reg_any,
 };
 
-pub struct Region<'a>(&'a CStr, u64);
-pub struct AnyRegion<'a>(&'a CStr);
-pub struct Name<'a>(&'a CStr);
+pub struct Region<'a>(pub &'a CStr, u64);
+pub struct AnyRegion<'a>(pub &'a CStr);
+pub struct Name<'a>(pub &'a CStr);
 
 mod details {
     use super::{

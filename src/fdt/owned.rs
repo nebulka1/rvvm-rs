@@ -11,6 +11,7 @@ use std::{
 use rvvm_sys::{
     fdt_node,
     fdt_node_create,
+    fdt_node_create_reg,
     fdt_node_free,
 };
 
@@ -23,9 +24,53 @@ pub struct NodeBuf {
 }
 
 impl NodeBuf {
+    /// Allocates single region-type `NodeBuf`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `name` contains nul-byte character
+    ///
+    /// Example:
+    ///
+    /// ```should_panic
+    /// use rvvm::fdt::*;
+    ///
+    /// let _ = NodeBuf::new_region("Hello world\0", 0);
+    /// ```
+    ///
+    /// Example that don't panic:
+    ///
+    /// ```
+    /// use rvvm::fdt::*;
+    ///
+    /// let _ = NodeBuf::new_region("CUMZONE", 0);
+    /// ```
+    pub fn new_region(name: impl AsRef<str>, address: u64) -> Self {
+        let name = CString::new(name.as_ref())
+            .expect("name contains nul-byte terminator");
+        let node_ptr =
+            unsafe { fdt_node_create_reg(name.as_ptr(), address) };
+
+        if node_ptr.is_null() {
+            panic!("Failed to create region node, this is a bug")
+        } else {
+            Self {
+                // SAFETY: safe, since `node_ptr` is a validly allocated
+                // and well-aligned pointer
+                inner: unsafe { Node::from_ptr_mut::<'static>(node_ptr) },
+            }
+        }
+    }
+
     /// Allocates single root fdt node. Same as Calling
     /// `NodeBuf::new(None)`, so, for detailed
     /// description refer to the `NodeBuf::new` method.
+    ///
+    /// ```
+    /// use rvvm::fdt::*;
+    ///
+    /// assert!(NodeBuf::root().is_root());
+    /// ```
     pub fn root() -> Self {
         Self::new(None)
     }
