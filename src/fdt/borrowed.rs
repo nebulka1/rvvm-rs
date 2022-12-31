@@ -6,6 +6,11 @@ use static_assertions::{
     assert_eq_size,
 };
 
+use super::{
+    FdtFindExt,
+    FdtNodeAddExt,
+};
+
 /// Struct that represents the underlying `fdt_node`
 /// (Flattened device tree).
 #[repr(transparent)]
@@ -15,6 +20,65 @@ pub struct Node {
 
 assert_eq_size!(Node, fdt_node);
 assert_eq_align!(Node, fdt_node);
+
+impl Node {
+    pub fn add<Prop: FdtNodeAddExt>(
+        &mut self,
+        name: impl AsRef<CStr>,
+        prop: Prop,
+    ) {
+        // SAFETY: safe, since self is well-allocated and
+        // well-aligned
+        unsafe {
+            prop.fdt_node_add(
+                name.as_ref(),
+                self as *mut Node as *mut fdt_node,
+            )
+        }
+    }
+
+    /// Search node in the tree. See `Node::find`.
+    pub fn find_mut<By: FdtFindExt>(
+        &mut self,
+        by: By,
+    ) -> Option<&'_ mut Node> {
+        // SAFETY: safe, since search operation will not mutate
+        // passed pointer
+        let result = unsafe { by.find_child_ptr(self.mut_ptr_immut()) };
+
+        if result.is_null() {
+            None
+        } else {
+            // SAFETY: safe, since user can't get two mutable refs from
+            // this function
+            Some(unsafe { Node::from_ptr_mut(result) })
+        }
+    }
+
+    /// Search through the node tree.
+    ///
+    /// Supported filters:
+    /// - by name search, takes Name(cstr) struct
+    /// - by name search, takes any `AsRef<str>` struct, but
+    ///   allocates new `CString` and can panic if passed
+    ///   string contains nul-byte terminator
+    /// - search by name and region (searches the region
+    ///   node type), takes Region(cstr, region).
+    /// - search by name (searches the region node type),
+    ///   takes AnyRegion(cstr)
+    pub fn find<By: FdtFindExt>(&self, by: By) -> Option<&'_ Node> {
+        // SAFETY: safe, since search operation will not mutate
+        // passed pointer
+        let result = unsafe { by.find_child_ptr(self.mut_ptr_immut()) };
+
+        if result.is_null() {
+            None
+        } else {
+            // SAFETY: safe, since result is not null and well-aligned
+            Some(unsafe { Node::from_ptr(result as *const _) })
+        }
+    }
+}
 
 impl Node {
     /// Creates `Node` from the `fdt_node` type.
@@ -39,7 +103,8 @@ impl Node {
         if self.node.name.is_null() {
             None
         } else {
-            // SAFETY: safe since self.node.name is not null
+            // SAFETY: safe since self.node.name is not null & contains
+            // nul-byte terminator
             Some(unsafe { CStr::from_ptr::<'a>(self.node.name) })
         }
     }
@@ -95,6 +160,18 @@ impl Node {
         ptr: *mut fdt_node,
     ) -> &'new mut Node {
         &mut *(ptr as *mut Node)
+    }
+}
+
+impl Node {
+    unsafe fn mut_ptr_immut<'a>(&'a self) -> *mut fdt_node {
+        union U<'a> {
+            i: &'a Node,
+            o: *mut fdt_node,
+        }
+
+        // VERY evil cast
+        U::<'a> { i: self }.o
     }
 }
 
