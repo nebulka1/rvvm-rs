@@ -24,7 +24,9 @@ static_assertions = "1.1.0"
 
 [dependencies]
 rvvm-sys = { version = "0.1.0", path = "packages/rvvm-sys" }
+rvvm-macro = { version = "0.1.0", path = "packages/rvvm-macro" }
 
 integral-enum = { workspace = true }
 thiserror = { workspace = true }
 static_assertions = { workspace = true }
+paste = "1.0.11"

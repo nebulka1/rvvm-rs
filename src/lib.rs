@@ -8,11 +8,14 @@ pub mod error;
 
 pub mod types;
 
-pub use rvvm_sys as ffi;
+pub mod prelude;
 
+mod declmacro;
 mod internal_utils;
 
 #[cfg(test)]
 mod tests;
 
-mod declmacro;
+pub use paste as __paste;
+pub use rvvm_macro as macros;
+pub use rvvm_sys as ffi;

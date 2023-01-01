@@ -7,25 +7,42 @@ use std::{
 use rvvm_sys::rvvm_mmio_dev_t;
 
 use super::type_::DeviceType;
-use crate::internal_utils::{
-    allocate_boxed_voidptr,
-    free_boxed_voidptr,
+use crate::{
+    builders::dev::mmio::DeviceBuilder,
+    internal_utils::{
+        allocate_boxed_voidptr,
+        free_boxed_voidptr,
+    },
+    types::RwHandler,
 };
 
 #[repr(transparent)]
-pub struct Device<T: 'static> {
+pub struct Device<T> {
     pub(crate) inner: rvvm_mmio_dev_t,
 
     _phantom: PhantomData<T>,
 }
 
 impl<T> Device<T> {
+    pub const fn size(&self) -> usize {
+        self.inner.size
+    }
+}
+
+impl<T> Device<T> {
+    pub fn builder() -> DeviceBuilder<T> {
+        DeviceBuilder::default()
+    }
+
     pub fn new(
         address: u64,
         size: usize,
 
         data: T,
         dev_ty: DeviceType<T>,
+
+        read: RwHandler<T>,
+        write: RwHandler<T>,
 
         op_sizes: impl Into<RangeInclusive<u8>>,
     ) -> Self {
@@ -50,8 +67,8 @@ impl<T> Device<T> {
             type_: unsafe { allocate_boxed_voidptr(dev_ty) as *mut _ },
 
             // TODO: Implement read-write handlers
-            read: None,
-            write: None,
+            read: read.inner,
+            write: write.inner,
         };
 
         Self {
