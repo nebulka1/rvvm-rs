@@ -3,6 +3,10 @@ name = "rvvm-macro"
 version = "0.1.0"
 edition = "2021"
 
+authors = ["Nero (kvxmmu)"]
+description = "macros for the rvvm crate"
+license-file = "../../LICENSE"
+
 [lib]
 proc-macro = true
 
