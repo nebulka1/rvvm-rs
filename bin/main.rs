@@ -21,7 +21,7 @@ fn main() {
         .op_size(1..=1)
         .build();
 
-    match instance.attach_device(uart) {
+    match instance.try_attach_device(uart) {
         Ok(handle) => {
             println!("Attached UART: {handle:?}");
         }
