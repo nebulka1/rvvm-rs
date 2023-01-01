@@ -1,5 +1,19 @@
+use std::marker::PhantomData;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DeviceHandle(pub(crate) i32);
+pub struct DeviceHandle<T> {
+    pub(crate) id: i32,
+    phantom: PhantomData<T>,
+}
+
+impl<T> DeviceHandle<T> {
+    pub(crate) const fn new(id: i32) -> Self {
+        Self {
+            id,
+            phantom: PhantomData,
+        }
+    }
+}
 
 crate::__ts_handler! {
     name = TypeHandler,

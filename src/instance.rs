@@ -1,10 +1,22 @@
-use std::ptr::NonNull;
+use std::{
+    mem,
+    ptr::NonNull,
+    slice,
+};
 
 use rvvm_sys::{
     rvvm_attach_mmio,
     rvvm_create_machine,
     rvvm_free_machine,
+    rvvm_get_fdt_root,
+    rvvm_get_fdt_soc,
+    rvvm_get_mmio,
+    rvvm_machine_powered_on,
     rvvm_machine_t,
+    rvvm_pause_machine,
+    rvvm_read_ram,
+    rvvm_start_machine,
+    rvvm_write_ram,
     RVVM_DEFAULT_MEMBASE,
     RVVM_INVALID_MMIO,
     RVVM_VM_IS_RUNNING_ERR,
@@ -16,7 +28,9 @@ use crate::{
     error::{
         DeviceAttachError,
         InstanceCreateError,
+        MemoryAccessError,
     },
+    fdt::*,
     types::DeviceHandle,
 };
 
@@ -25,10 +39,177 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn attach_device<T: Send + Sync>(
+    /// Writes `data` to the machine's RAM
+    ///
+    /// - Returns `Ok` if data was successfully written
+    /// - Returns `MemoryAccessError` otherwise
+    pub fn write_ram(
+        &mut self,
+        dst: u64,
+        data: &[u8],
+    ) -> Result<(), MemoryAccessError> {
+        let result = unsafe {
+            rvvm_write_ram(
+                self.ptr.as_ptr(),
+                dst,
+                data.as_ptr() as *mut _,
+                data.len(),
+            )
+        };
+
+        if result {
+            Ok(())
+        } else {
+            Err(MemoryAccessError::OutOfBounds)
+        }
+    }
+
+    /// Read from machine's memory to slice
+    ///
+    /// Same as `Instance::read_ram_to_uninit`, but reads
+    /// into initialized slice.
+    /// See `Instance::read_ram_to_uninit` for more detailed
+    /// information
+    pub fn read_ram_to<'a>(
+        &self,
+        src: u64,
+        dest: &'a mut [u8],
+    ) -> Result<(), MemoryAccessError> {
+        unsafe {
+            self.read_ram_to_uninit(
+                src,
+                slice::from_raw_parts_mut::<'a, mem::MaybeUninit<u8>>(
+                    dest.as_ptr() as *mut _,
+                    dest.len(),
+                ),
+            )
+        }
+    }
+
+    /// Read from machine's memory to uninitialized slice
+    ///
+    /// - Returns `Ok` if memory is successfully read
+    /// - Returns `MemoryAccessError` otherwise
+    pub fn read_ram_to_uninit(
+        &self,
+        src: u64,
+        dest: &mut [mem::MaybeUninit<u8>],
+    ) -> Result<(), MemoryAccessError> {
+        let result = unsafe {
+            rvvm_read_ram(
+                self.ptr.as_ptr(),
+                dest.as_ptr() as *mut _,
+                src,
+                dest.len(),
+            )
+        };
+
+        if result {
+            Ok(())
+        } else {
+            Err(MemoryAccessError::OutOfBounds)
+        }
+    }
+}
+
+impl Instance {
+    /// Get mutable reference to the root FDT
+    pub fn fdt_root_mut<'a>(&'a mut self) -> &'a mut Node {
+        unsafe {
+            Node::from_ptr_mut::<'a>(rvvm_get_fdt_root(self.ptr.as_ptr()))
+        }
+    }
+
+    /// Get immutable reference to the root FDT
+    pub fn fdt_root<'a>(&'a self) -> &'a Node {
+        unsafe {
+            Node::from_ptr::<'a>(rvvm_get_fdt_root(self.ptr.as_ptr()))
+        }
+    }
+
+    /// Get mutable reference to the SoC's FDT
+    pub fn fdt_soc_mut<'a>(&'a mut self) -> &'a mut Node {
+        unsafe {
+            Node::from_ptr_mut::<'a>(rvvm_get_fdt_soc(self.ptr.as_ptr()))
+        }
+    }
+
+    /// Get immutable reference to the SoC's FDT
+    pub fn fdt_soc<'a>(&'a self) -> &'a Node {
+        unsafe {
+            Node::from_ptr::<'a>(rvvm_get_fdt_soc(self.ptr.as_ptr()))
+        }
+    }
+}
+
+impl Instance {
+    /// Get mutable reference to the RVVM's mmio device
+    pub fn get_device_mut<T: Send + Sync>(
+        &mut self,
+        handle: DeviceHandle<T>,
+    ) -> Option<&mut Device<T>> {
+        let dev = unsafe { rvvm_get_mmio(self.ptr.as_ptr(), handle.id) };
+
+        if dev.is_null() {
+            None
+        } else {
+            // SAFETY: dev != null and mutable reference can't be
+            // obtained twice because `&mut Device<T>` lifetime is
+            // bounded by the `self`
+            Some(unsafe { &mut *(dev as *mut Device<T>) })
+        }
+    }
+
+    /// Get immutable reference to the RVVM's mmio device
+    pub fn get_device<T: Send + Sync>(
+        &self,
+        handle: DeviceHandle<T>,
+    ) -> Option<&Device<T>> {
+        // SAFETY: self.ptr is valid rvvm machine ptr
+        let dev = unsafe { rvvm_get_mmio(self.ptr.as_ptr(), handle.id) };
+
+        if dev.is_null() {
+            None
+        } else {
+            // SAFETY: dev != null
+            Some(unsafe { &*(dev as *const Device<T>) })
+        }
+    }
+}
+
+impl Instance {
+    pub fn powered_on(&self) -> bool {
+        // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
+        unsafe { rvvm_machine_powered_on(self.ptr.as_ptr()) }
+    }
+
+    /// Spawns CPU threads and continues machine execution
+    pub fn start(&mut self) {
+        // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
+        unsafe { rvvm_start_machine(self.ptr.as_ptr()) }
+    }
+
+    /// Stops the CPUs, the machine is frozen upon return
+    pub fn pause(&mut self) {
+        // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
+        unsafe {
+            rvvm_pause_machine(self.ptr.as_ptr());
+        }
+    }
+}
+
+impl Instance {
+    /// Tries to attach `Device<T>` to the paused virtual
+    /// machine.
+    ///
+    /// Possible results:
+    /// - `Ok(handle)`, returns typed device handle inside
+    ///   the virtual machine
+    /// - `Err(e)`, returns `DeviceAttachError` enum
+    pub fn try_attach_device<T: Send + Sync>(
         &mut self,
         mut device: Device<T>,
-    ) -> Result<DeviceHandle, DeviceAttachError> {
+    ) -> Result<DeviceHandle<T>, DeviceAttachError> {
         device.inner.machine = self.ptr.as_ptr();
 
         let handle = unsafe {
@@ -44,7 +225,7 @@ impl Instance {
             RVVM_VM_IS_RUNNING_ERR => Err(DeviceAttachError::VmIsRunning),
             RVVM_INVALID_MMIO => Err(DeviceAttachError::RegionIsOccupied),
 
-            h @ 0.. => Ok(DeviceHandle(h)),
+            h @ 0.. => Ok(DeviceHandle::new(h)),
             _ => unreachable!(),
         }
     }

@@ -10,6 +10,13 @@ pub enum InstanceCreateError {
 
 #[derive(IntegralEnum, Error)]
 #[enum_disable(display)]
+pub enum MemoryAccessError {
+    #[error("Requested range is out-of-bounds")]
+    OutOfBounds,
+}
+
+#[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
 pub enum DeviceAttachError {
     #[error("Tried to attach device to already occupied region")]
     RegionIsOccupied,
