@@ -17,19 +17,19 @@ use crate::{
 };
 
 #[repr(transparent)]
-pub struct Device<T> {
+pub struct Device<T: Send + Sync> {
     pub(crate) inner: rvvm_mmio_dev_t,
 
     _phantom: PhantomData<T>,
 }
 
-impl<T> Device<T> {
+impl<T: Send + Sync> Device<T> {
     pub const fn size(&self) -> usize {
         self.inner.size
     }
 }
 
-impl<T> Device<T> {
+impl<T: Send + Sync> Device<T> {
     pub fn builder() -> DeviceBuilder<T> {
         DeviceBuilder::default()
     }
@@ -78,7 +78,7 @@ impl<T> Device<T> {
     }
 }
 
-impl<T> Drop for Device<T> {
+impl<T: Send + Sync> Drop for Device<T> {
     fn drop(&mut self) {
         // Deallocate data
         // SAFETY: data is allocated through the

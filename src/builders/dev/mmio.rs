@@ -6,7 +6,7 @@ use crate::prelude::{
     RwHandler,
 };
 
-pub struct DeviceBuilder<T> {
+pub struct DeviceBuilder<T: Send + Sync> {
     address: Option<u64>,
     size: Option<usize>,
 
@@ -19,7 +19,7 @@ pub struct DeviceBuilder<T> {
     op_sizes: Option<RangeInclusive<u8>>,
 }
 
-impl<T> Default for DeviceBuilder<T> {
+impl<T: Send + Sync> Default for DeviceBuilder<T> {
     fn default() -> Self {
         Self {
             address: None,
@@ -33,7 +33,7 @@ impl<T> Default for DeviceBuilder<T> {
     }
 }
 
-impl<T> DeviceBuilder<T> {
+impl<T: Send + Sync> DeviceBuilder<T> {
     pub fn device_type(self, ty: DeviceType<T>) -> Self {
         self.type_(ty)
     }

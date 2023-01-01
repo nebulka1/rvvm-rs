@@ -25,7 +25,7 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn attach_device<T>(
+    pub fn attach_device<T: Send + Sync>(
         &mut self,
         mut device: Device<T>,
     ) -> Result<DeviceHandle, DeviceAttachError> {

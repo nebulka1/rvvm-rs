@@ -15,12 +15,12 @@ use super::mmio::Device;
 /// its lifetime-related things, like remove/update/reset
 /// callbacks
 #[repr(transparent)]
-pub struct DeviceType<T> {
+pub struct DeviceType<T: Send + Sync> {
     _inner: rvvm_mmio_type_t,
     _phantom: PhantomData<T>,
 }
 
-impl<T: 'static> DeviceType<T> {
+impl<T: Send + Sync> DeviceType<T> {
     /// Simple drop glue needed for the `type->remove`
     /// function
     ///
