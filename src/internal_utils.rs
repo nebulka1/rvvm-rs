@@ -1,7 +1,4 @@
-use std::{
-    ffi::c_void,
-    ptr,
-};
+use std::ffi::c_void;
 
 pub unsafe fn allocate_boxed_voidptr<T>(value: T) -> *mut c_void {
     let data = Box::new(value);

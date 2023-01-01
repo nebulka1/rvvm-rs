@@ -1,19 +1,55 @@
 use std::ptr::NonNull;
 
 use rvvm_sys::{
+    rvvm_attach_mmio,
     rvvm_create_machine,
     rvvm_free_machine,
     rvvm_machine_t,
     RVVM_DEFAULT_MEMBASE,
+    RVVM_INVALID_MMIO,
+    RVVM_VM_IS_RUNNING_ERR,
 };
 
 use crate::{
     builders::instance::InstanceBuilder,
-    error::InstanceCreateError,
+    dev::mmio::Device,
+    error::{
+        DeviceAttachError,
+        InstanceCreateError,
+    },
+    types::DeviceHandle,
 };
 
 pub struct Instance {
     ptr: NonNull<rvvm_machine_t>,
+}
+
+impl Instance {
+    pub fn attach_device<T>(
+        &mut self,
+        mut device: Device<T>,
+    ) -> Result<DeviceHandle, DeviceAttachError> {
+        device.inner.machine = self.ptr.as_ptr();
+
+        let handle = unsafe {
+            rvvm_attach_mmio(
+                self.ptr.as_ptr(),
+                &device as *const Device<_> as *const _,
+            )
+        };
+
+        std::mem::forget(device);
+
+        if handle == RVVM_VM_IS_RUNNING_ERR {
+            Err(DeviceAttachError::VmIsRunning)
+        } else if handle == RVVM_INVALID_MMIO {
+            Err(DeviceAttachError::RegionIsOccupied)
+        } else if handle >= 0 {
+            Ok(DeviceHandle(handle))
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 impl Instance {
