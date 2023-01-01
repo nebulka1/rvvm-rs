@@ -40,14 +40,12 @@ impl Instance {
 
         std::mem::forget(device);
 
-        if handle == RVVM_VM_IS_RUNNING_ERR {
-            Err(DeviceAttachError::VmIsRunning)
-        } else if handle == RVVM_INVALID_MMIO {
-            Err(DeviceAttachError::RegionIsOccupied)
-        } else if handle >= 0 {
-            Ok(DeviceHandle(handle))
-        } else {
-            unreachable!()
+        match handle {
+            RVVM_VM_IS_RUNNING_ERR => Err(DeviceAttachError::VmIsRunning),
+            RVVM_INVALID_MMIO => Err(DeviceAttachError::RegionIsOccupied),
+
+            h @ 0.. => Ok(DeviceHandle(h)),
+            _ => unreachable!(),
         }
     }
 }
