@@ -7,6 +7,11 @@ crate::__ts_handler! {
 }
 
 crate::__ts_handler! {
+    name = RemoveHandler,
+    raw = RawTypeHandler
+}
+
+crate::__ts_handler! {
     name = RwHandler,
     raw = unsafe extern "C" fn(
         dev: *mut rvvm_sys::rvvm_mmio_dev_t,

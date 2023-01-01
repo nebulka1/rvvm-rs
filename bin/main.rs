@@ -1,8 +1,18 @@
 use rvvm::prelude::*;
 
+#[on_remove(ty = "()")]
+fn test(dev: &mut Device<()>) {
+    println!("I AM REMOVED!!!");
+}
+
 fn main() {
     let mut instance = Instance::builder().build();
-    let uart_ty = DeviceType::new("UART");
+    let uart_ty = DeviceType::custom(
+        "UART",
+        test,
+        TypeHandler::none(),
+        TypeHandler::none(),
+    );
     let uart = Device::builder()
         .address(0x1024)
         .size(1024)

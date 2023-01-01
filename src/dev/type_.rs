@@ -10,6 +10,10 @@ use rvvm_sys::{
 };
 
 use super::mmio::Device;
+use crate::prelude::{
+    RemoveHandler,
+    TypeHandler,
+};
 
 /// Type that describes the device's type and
 /// its lifetime-related things, like remove/update/reset
@@ -35,21 +39,25 @@ impl<T: Send + Sync> DeviceType<T> {
     }
 
     /// Create type-safe wrapper `DeviceType<T>` around the
-    /// underlying `rvvm_mmio_type_t`
+    /// underlying `rvvm_mmio_type_t` with custom handlers.
     ///
     /// # Panics
     ///
     /// Panics if `name` contains nul-byte character
-    pub fn new(name: impl AsRef<str>) -> Self {
+    pub fn custom(
+        name: impl AsRef<str>,
+        remove: RemoveHandler<T>,
+        update: TypeHandler<T>,
+        reset: TypeHandler<T>,
+    ) -> Self {
         let name = CString::new(name.as_ref())
             .expect("Name contains nul-byte character");
         let type_ = rvvm_mmio_type_t {
             name: name.as_ptr(),
 
-            // TODO: Implement custom handlers
-            remove: Some(Self::drop_glue),
-            update: None,
-            reset: None,
+            remove: remove.inner,
+            update: update.inner,
+            reset: reset.inner,
         };
 
         std::mem::forget(name);
@@ -58,5 +66,22 @@ impl<T: Send + Sync> DeviceType<T> {
             _inner: type_,
             _phantom: PhantomData,
         }
+    }
+
+    /// Same as `DeviceType::custom`, but leaves update and
+    /// reset handlers empty. `remove` handler is set always
+    /// and it contains `DeviceType::drop_glue`.
+    ///
+    /// For more detailed information and **panics** see
+    /// `DeviceType::custom`
+    pub fn new(name: impl AsRef<str>) -> Self {
+        Self::custom(
+            name,
+            // SAFETY: Self::drop_glue is internally
+            // implemented fn
+            unsafe { RemoveHandler::new(Self::drop_glue) },
+            TypeHandler::none(),
+            TypeHandler::none(),
+        )
     }
 }
