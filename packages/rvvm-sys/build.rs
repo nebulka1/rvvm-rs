@@ -9,7 +9,7 @@ use std::{
 
 const BUILDDIR_SUFFIX: &str = "rvvm-shared";
 const LIB_NAME: &str = "rvvm";
-static RVVM_PATH: &str = "../../misc/rvvm-git";
+static RVVM_PATH: &str = "rvvm-git";
 
 fn main() {
     let build_dir: PathBuf = temp_dir().join(BUILDDIR_SUFFIX);

@@ -1,4 +1,4 @@
 [submodule "packages/rvvm-sys/rvvm-git"]
-	path = misc/rvvm-git
+	path = packages/rvvm-sys/rvvm-git
 	url = https://github.com/lekkit/rvvm
 	branch = staging
