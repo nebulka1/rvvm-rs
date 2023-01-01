@@ -18,6 +18,7 @@ mod internal_utils;
 #[cfg(test)]
 mod tests;
 
+#[doc(hidden)]
 pub use paste as __paste;
 pub use rvvm_macro as macros;
 pub use rvvm_sys as ffi;
