@@ -20,7 +20,7 @@ use crate::prelude::{
 /// callbacks
 #[repr(transparent)]
 pub struct DeviceType<T: Send + Sync> {
-    _inner: rvvm_mmio_type_t,
+    inner: rvvm_mmio_type_t,
     _phantom: PhantomData<T>,
 }
 
@@ -53,17 +53,19 @@ impl<T: Send + Sync> DeviceType<T> {
         let name = CString::new(name.as_ref())
             .expect("Name contains nul-byte character");
         let type_ = rvvm_mmio_type_t {
-            name: name.as_ptr(),
+            name: name.into_raw(),
 
-            remove: remove.inner,
+            remove: if remove.inner.is_none() {
+                Some(Self::drop_glue)
+            } else {
+                remove.inner
+            },
             update: update.inner,
             reset: reset.inner,
         };
 
-        std::mem::forget(name);
-
         Self {
-            _inner: type_,
+            inner: type_,
             _phantom: PhantomData,
         }
     }
@@ -83,5 +85,17 @@ impl<T: Send + Sync> DeviceType<T> {
             TypeHandler::none(),
             TypeHandler::none(),
         )
+    }
+}
+
+impl<T: Send + Sync> Drop for DeviceType<T> {
+    fn drop(&mut self) {
+        union U {
+            i: *const i8,
+            o: *mut i8,
+        }
+        // SAFETY: safe, since `self.inner.name` is previously
+        // obtained through the `CString::into_raw`
+        let _ = unsafe { CString::from_raw(U { i: self.inner.name }.o) };
     }
 }
