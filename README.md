@@ -65,5 +65,6 @@ fn main() {
 - [ ] Userland API
 - [ ] `DMA`
 - [ ] Test `UART` device
+- [ ] rvvm-sys features (like fdt, jit or smth)
 
 Possibly I've lost something, so the list will be supplemented/updated. 
