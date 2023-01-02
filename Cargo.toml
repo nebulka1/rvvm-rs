@@ -11,7 +11,7 @@ description = "idiomatic RVVM Rust bindings"
 repository = "https://github.com/RVVM-rs/rvvm"
 
 [profile.release]
-lto = false
+lto = true
 opt-level = 3
 
 [[bin]]
