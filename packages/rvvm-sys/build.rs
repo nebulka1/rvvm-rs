@@ -23,6 +23,7 @@ fn main() {
         "dylib"
     } else {
         build_static(&build_dir);
+        // ty: Nebulka <arapun@proton.me>
         "static:+whole-archive,-bundle"
     };
 
