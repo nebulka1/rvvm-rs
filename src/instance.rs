@@ -1,5 +1,7 @@
 use std::{
+    ffi::CString,
     mem,
+    path::Path,
     ptr::NonNull,
     slice,
 };
@@ -11,6 +13,9 @@ use rvvm_sys::{
     rvvm_get_fdt_root,
     rvvm_get_fdt_soc,
     rvvm_get_mmio,
+    rvvm_load_bootrom,
+    rvvm_load_dtb,
+    rvvm_load_kernel,
     rvvm_machine_powered_on,
     rvvm_machine_t,
     rvvm_pause_machine,
@@ -39,6 +44,74 @@ pub struct Instance {
 }
 
 impl Instance {
+    /// Load device tree binary into machine's RAM.
+    ///
+    /// - Returns `Ok` if load was successful
+    /// - Returns `MemoryAccessError` otherwise
+    ///
+    /// # Panics
+    ///
+    /// Panics if path has nul-byte character or if path is
+    /// not a valid utf8 sequence.
+    pub fn load_dtb(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<(), MemoryAccessError> {
+        self.loader_impl(path, rvvm_load_dtb)
+    }
+
+    /// Load kernel binary into machine's RAM.
+    ///
+    /// - Returns `Ok` if load was successful
+    /// - Returns `MemoryAccessError` otherwise
+    /// # Panics
+    ///
+    /// Panics if path has nul-byte character or if path is
+    /// not a valid utf8 sequence.
+    pub fn load_kernel(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<(), MemoryAccessError> {
+        self.loader_impl(path, rvvm_load_kernel)
+    }
+
+    /// Load bootrom binary into machine's RAM.
+    ///
+    /// - Returns `Ok` if load was successful
+    /// - Returns `MemoryAccessError` otherwise
+    /// # Panics
+    ///
+    /// Panics if path has nul-byte character or if path is
+    /// not a valid utf8 sequence.
+    pub fn load_bootrom(
+        &mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<(), MemoryAccessError> {
+        self.loader_impl(path, rvvm_load_bootrom)
+    }
+
+    fn loader_impl(
+        &mut self,
+        path: impl AsRef<Path>,
+        fn_: unsafe extern "C" fn(
+            *mut rvvm_machine_t,
+            *const std::ffi::c_char,
+        ) -> bool,
+    ) -> Result<(), MemoryAccessError> {
+        let path = CString::new(
+            path.as_ref()
+                .to_str()
+                .expect("path is not a valid utf8 sequence"),
+        )
+        .expect("Path contains nul-byte character");
+
+        Self::bool_to_memacc(unsafe {
+            fn_(self.ptr.as_ptr(), path.as_ptr())
+        })
+    }
+}
+
+impl Instance {
     /// Writes `data` to the machine's RAM
     ///
     /// - Returns `Ok` if data was successfully written
@@ -48,20 +121,14 @@ impl Instance {
         dst: u64,
         data: &[u8],
     ) -> Result<(), MemoryAccessError> {
-        let result = unsafe {
+        Self::bool_to_memacc(unsafe {
             rvvm_write_ram(
                 self.ptr.as_ptr(),
                 dst,
                 data.as_ptr() as *mut _,
                 data.len(),
             )
-        };
-
-        if result {
-            Ok(())
-        } else {
-            Err(MemoryAccessError::OutOfBounds)
-        }
+        })
     }
 
     /// Read from machine's memory to slice
@@ -95,16 +162,18 @@ impl Instance {
         src: u64,
         dest: &mut [mem::MaybeUninit<u8>],
     ) -> Result<(), MemoryAccessError> {
-        let result = unsafe {
+        Self::bool_to_memacc(unsafe {
             rvvm_read_ram(
                 self.ptr.as_ptr(),
                 dest.as_ptr() as *mut _,
                 src,
                 dest.len(),
             )
-        };
+        })
+    }
 
-        if result {
+    fn bool_to_memacc(b: bool) -> Result<(), MemoryAccessError> {
+        if b {
             Ok(())
         } else {
             Err(MemoryAccessError::OutOfBounds)

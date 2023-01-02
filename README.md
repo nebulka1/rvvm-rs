@@ -59,7 +59,7 @@ fn main() {
 - [x] Access to the virtual machine's FDT
 - [x] `pause`/`start`/`powered_on` APIs
 
-- [ ] loading kernel/bootrom/dtb
+- [x] loading kernel/bootrom/dtb
 - [ ] Run virtual machine's event loop
 - [ ] PLIC/i2c
 - [ ] Userland API
