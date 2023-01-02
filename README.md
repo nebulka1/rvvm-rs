@@ -60,6 +60,7 @@ fn main() {
 - [x] `pause`/`start`/`powered_on` APIs
 
 - [x] loading kernel/bootrom/dtb
+- [x] dumping dtb to file
 - [ ] Run virtual machine's event loop
 - [ ] PLIC/i2c
 - [ ] Userland API
