@@ -9,6 +9,11 @@ description = "Raw ffi bindings to the RVVM's public API"
 license-file = "../../LICENSE"
 
 repository = "https://github.com/RVVM-rs/rvvm"
+links = "rvvm"
+
+[features]
+default = []
+dynamic = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

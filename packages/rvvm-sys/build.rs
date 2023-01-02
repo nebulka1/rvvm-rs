@@ -3,32 +3,37 @@ use std::{
         self,
         temp_dir,
     },
-    path::PathBuf,
+    path::{
+        Path,
+        PathBuf,
+    },
     process::Command,
 };
 
-const BUILDDIR_SUFFIX: &str = "rvvm-shared";
+const BUILDDIR_SUFFIX: &str = "rvvm-lib";
 const LIB_NAME: &str = "rvvm";
 static RVVM_PATH: &str = "rvvm-git";
 
 fn main() {
     let build_dir: PathBuf = temp_dir().join(BUILDDIR_SUFFIX);
+    let kind = if env::var("CARGO_FEATURE_DYNAMIC").is_ok() {
+        "dylib"
+    } else {
+        build_static(&build_dir);
+        "static"
+    };
 
     println!("cargo:rerun-if-changed={RVVM_PATH}/src/rvvmlib.h");
-    println!(
-        "cargo:rustc-link-search={}",
-        build_dir.as_os_str().to_str().unwrap()
-    );
-    println!("cargo:rustc-link-lib={LIB_NAME}");
+    println!("cargo:rustc-link-search={}", build_dir.to_str().unwrap());
+    println!("cargo:rustc-link-lib={kind}={LIB_NAME}");
 
-    let status = Command::new("make")
-        .arg("lib")
-        .env("BUILDDIR", &build_dir)
-        .current_dir(RVVM_PATH)
-        .status()
-        .expect("Failed to spawn make command");
-    if !status.success() {
-        panic!("Failed to build RVVM. Possibly make is not installed");
+    if kind == "static" {
+        println!("cargo:rustc-link-lib={kind}=rvjit");
+        println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu32");
+        println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu64");
+    } else {
+        // FIXME: Possibly we don't need this
+        build_dynamic(&build_dir);
     }
 
     let bindings = bindgen::Builder::default()
@@ -41,4 +46,42 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Failed to write bindings");
+}
+
+fn build_dynamic(build_dir: &Path) {
+    let status = Command::new("make")
+        .arg("lib")
+        .env("BUILDDIR", build_dir.to_str().unwrap())
+        .current_dir(RVVM_PATH)
+        .status()
+        .expect(
+            "Failed to run make command. Possibly GNU make is not \
+             installed",
+        );
+    if !status.success() {
+        panic!("Failed to build RVVM dylib");
+    }
+}
+
+fn build_static(build_dir: &Path) {
+    let status = Command::new("cmake")
+        .args(["-S", ".", "-B", build_dir.to_str().unwrap()])
+        .current_dir(RVVM_PATH)
+        .status()
+        .expect("Failed to spawn cmake command");
+
+    if !status.success() {
+        panic!(
+            "Failed to build RVVM staticlib. Possibly cmake is not \
+             installed"
+        );
+    }
+    let status = Command::new("cmake")
+        .args(["--build", "."])
+        .current_dir(build_dir)
+        .status()
+        .expect("Failed to spawn cmake command");
+    if !status.success() {
+        panic!("Failed to build static lib RVVM");
+    }
 }
