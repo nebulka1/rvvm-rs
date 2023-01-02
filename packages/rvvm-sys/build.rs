@@ -29,16 +29,16 @@ fn main() {
     };
 
     println!("cargo:rerun-if-changed={RVVM_PATH}/src/rvvmlib.h");
-    println!("cargo:rustc-link-search={}", build_dir.to_str().unwrap());
     println!("cargo:rustc-link-lib={kind}={LIB_NAME}");
 
     if kind == "static" {
+        println!(
+            "cargo:rustc-link-search={}",
+            build_dir.to_str().unwrap()
+        );
         println!("cargo:rustc-link-lib={kind}=rvjit");
         println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu32");
         println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu64");
-    } else {
-        // FIXME: Possibly we don't need this
-        build_dynamic(&build_dir);
     }
 
     let bindings = bindgen::Builder::default()
@@ -51,21 +51,6 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Failed to write bindings");
-}
-
-fn build_dynamic(build_dir: &Path) {
-    let status = Command::new("make")
-        .arg("lib")
-        .env("BUILDDIR", build_dir.to_str().unwrap())
-        .current_dir(RVVM_PATH)
-        .status()
-        .expect(
-            "Failed to run make command. Possibly GNU make is not \
-             installed",
-        );
-    if !status.success() {
-        panic!("Failed to build RVVM dylib");
-    }
 }
 
 fn build_static(build_dir: &Path) {
