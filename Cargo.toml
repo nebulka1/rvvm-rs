@@ -26,10 +26,12 @@ thiserror = "1.0.38"
 integral-enum = "1.2.1"
 static_assertions = "1.1.0"
 
+[features]
+default = []
+dynamic = ["rvvm-sys/dynamic"]
+
 [dependencies]
-rvvm-sys = { version = "1.1.2", features = [
-    "dynamic",
-], path = "packages/rvvm-sys" }
+rvvm-sys = { version = "1.1.2", path = "packages/rvvm-sys" }
 rvvm-macro = { version = "0.1.0", path = "packages/rvvm-macro" }
 
 integral-enum = { workspace = true }
