@@ -10,6 +10,20 @@ pub enum InstanceCreateError {
 
 #[derive(IntegralEnum, Error)]
 #[enum_disable(display)]
+pub enum InstancePauseError {
+    #[error("Instance is not running")]
+    NotRunning,
+}
+
+#[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
+pub enum InstanceStartError {
+    #[error("Instance is already running")]
+    AlreadyRunning,
+}
+
+#[derive(IntegralEnum, Error)]
+#[enum_disable(display)]
 pub enum DtbDumpError {
     #[error("Failed to open destination file for write")]
     FailedToOpenFile,
@@ -27,7 +41,4 @@ pub enum MemoryAccessError {
 pub enum DeviceAttachError {
     #[error("Tried to attach device to already occupied region")]
     RegionIsOccupied,
-
-    #[error("Can't attach device to the running machine")]
-    VmIsRunning,
 }

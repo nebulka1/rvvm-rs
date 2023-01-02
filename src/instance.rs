@@ -24,8 +24,6 @@ use rvvm_sys::{
     rvvm_start_machine,
     rvvm_write_ram,
     RVVM_DEFAULT_MEMBASE,
-    RVVM_INVALID_MMIO,
-    RVVM_VM_IS_RUNNING_ERR,
 };
 
 use crate::{
@@ -35,6 +33,8 @@ use crate::{
         DeviceAttachError,
         DtbDumpError,
         InstanceCreateError,
+        InstancePauseError,
+        InstanceStartError,
         MemoryAccessError,
     },
     fdt::*,
@@ -283,16 +283,25 @@ impl Instance {
     }
 
     /// Spawns CPU threads and continues machine execution
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Result<(), InstanceStartError> {
         // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
-        unsafe { rvvm_start_machine(self.ptr.as_ptr()) }
+        let result = unsafe { rvvm_start_machine(self.ptr.as_ptr()) };
+        if result {
+            Ok(())
+        } else {
+            Err(InstanceStartError::AlreadyRunning)
+        }
     }
 
     /// Stops the CPUs, the machine is frozen upon return
-    pub fn pause(&mut self) {
+    pub fn pause(&mut self) -> Result<(), InstancePauseError> {
         // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
-        unsafe {
-            rvvm_pause_machine(self.ptr.as_ptr());
+        let result = unsafe { rvvm_pause_machine(self.ptr.as_ptr()) };
+
+        if result {
+            Ok(())
+        } else {
+            Err(InstancePauseError::NotRunning)
         }
     }
 }
@@ -321,11 +330,8 @@ impl Instance {
         std::mem::forget(device);
 
         match handle {
-            RVVM_VM_IS_RUNNING_ERR => Err(DeviceAttachError::VmIsRunning),
-            RVVM_INVALID_MMIO => Err(DeviceAttachError::RegionIsOccupied),
-
             h @ 0.. => Ok(DeviceHandle::new(h)),
-            _ => unreachable!(),
+            _ => Err(DeviceAttachError::RegionIsOccupied),
         }
     }
 }
