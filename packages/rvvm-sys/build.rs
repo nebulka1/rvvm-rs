@@ -1,8 +1,6 @@
 use std::{
-    env::{
-        self,
-        temp_dir,
-    },
+    self,
+    env,
     path::{
         Path,
         PathBuf,
@@ -30,7 +28,7 @@ fn main() {
     println!("cargo:rerun-if-changed={RVVM_PATH}/src/rvvmlib.h");
     println!("cargo:rustc-link-lib={kind}={LIB_NAME}");
 
-    if is_dynamic {
+    if !is_dynamic {
         println!(
             "cargo:rustc-link-search={}",
             build_dir.to_str().unwrap()
