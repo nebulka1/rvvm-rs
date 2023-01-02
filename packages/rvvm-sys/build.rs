@@ -16,6 +16,11 @@ static RVVM_PATH: &str = "rvvm-git";
 
 fn main() {
     let build_dir: PathBuf = temp_dir().join(BUILDDIR_SUFFIX);
+    if build_dir.exists() {
+        std::fs::remove_dir_all(&build_dir)
+            .expect("Failed to cleanup previous build");
+    }
+
     let kind = if env::var("CARGO_FEATURE_DYNAMIC").is_ok() {
         "dylib"
     } else {
