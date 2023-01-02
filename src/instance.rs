@@ -9,6 +9,7 @@ use std::{
 use rvvm_sys::{
     rvvm_attach_mmio,
     rvvm_create_machine,
+    rvvm_dump_dtb,
     rvvm_free_machine,
     rvvm_get_fdt_root,
     rvvm_get_fdt_soc,
@@ -32,6 +33,7 @@ use crate::{
     dev::mmio::Device,
     error::{
         DeviceAttachError,
+        DtbDumpError,
         InstanceCreateError,
         MemoryAccessError,
     },
@@ -43,7 +45,20 @@ pub struct Instance {
     ptr: NonNull<rvvm_machine_t>,
 }
 
+// FIXME: add correct error reporting
+// mainly this could be fixed by RVVM, I'll make PR to ti
 impl Instance {
+    pub fn try_dump_dtb(
+        &mut self,
+        dest: impl AsRef<Path>,
+    ) -> Result<(), DtbDumpError> {
+        self.loader_dumper_impl(
+            DtbDumpError::FailedToOpenFile,
+            dest,
+            rvvm_dump_dtb,
+        )
+    }
+
     /// Load device tree binary into machine's RAM.
     ///
     /// - Returns `Ok` if load was successful
@@ -53,11 +68,15 @@ impl Instance {
     ///
     /// Panics if path has nul-byte character or if path is
     /// not a valid utf8 sequence.
-    pub fn load_dtb(
+    pub fn try_load_dtb(
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<(), MemoryAccessError> {
-        self.loader_impl(path, rvvm_load_dtb)
+        self.loader_dumper_impl(
+            MemoryAccessError::OutOfBounds,
+            path,
+            rvvm_load_dtb,
+        )
     }
 
     /// Load kernel binary into machine's RAM.
@@ -68,11 +87,15 @@ impl Instance {
     ///
     /// Panics if path has nul-byte character or if path is
     /// not a valid utf8 sequence.
-    pub fn load_kernel(
+    pub fn try_load_kernel(
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<(), MemoryAccessError> {
-        self.loader_impl(path, rvvm_load_kernel)
+        self.loader_dumper_impl(
+            MemoryAccessError::OutOfBounds,
+            path,
+            rvvm_load_kernel,
+        )
     }
 
     /// Load bootrom binary into machine's RAM.
@@ -83,21 +106,26 @@ impl Instance {
     ///
     /// Panics if path has nul-byte character or if path is
     /// not a valid utf8 sequence.
-    pub fn load_bootrom(
+    pub fn try_load_bootrom(
         &mut self,
         path: impl AsRef<Path>,
     ) -> Result<(), MemoryAccessError> {
-        self.loader_impl(path, rvvm_load_bootrom)
+        self.loader_dumper_impl(
+            MemoryAccessError::OutOfBounds,
+            path,
+            rvvm_load_bootrom,
+        )
     }
 
-    fn loader_impl(
+    fn loader_dumper_impl<E>(
         &mut self,
+        e: E,
         path: impl AsRef<Path>,
         fn_: unsafe extern "C" fn(
             *mut rvvm_machine_t,
             *const std::ffi::c_char,
         ) -> bool,
-    ) -> Result<(), MemoryAccessError> {
+    ) -> Result<(), E> {
         let path = CString::new(
             path.as_ref()
                 .to_str()
@@ -105,9 +133,11 @@ impl Instance {
         )
         .expect("Path contains nul-byte character");
 
-        Self::bool_to_memacc(unsafe {
-            fn_(self.ptr.as_ptr(), path.as_ptr())
-        })
+        if unsafe { fn_(self.ptr.as_ptr(), path.as_ptr()) } {
+            Ok(())
+        } else {
+            Err(e)
+        }
     }
 }
 
