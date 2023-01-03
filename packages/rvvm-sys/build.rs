@@ -22,7 +22,7 @@ fn main() {
     } else {
         build_static(&build_dir);
         // ty: Nebulka <arapun@proton.me>
-        "static:+whole-archive,-bundle"
+        "static"
     };
 
     println!("cargo:rerun-if-changed={RVVM_PATH}/src/rvvmlib.h");
@@ -33,10 +33,6 @@ fn main() {
             "cargo:rustc-link-search={}",
             build_dir.to_str().unwrap()
         );
-
-        println!("cargo:rustc-link-lib={kind}=rvjit");
-        println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu32");
-        println!("cargo:rustc-link-lib={kind}={LIB_NAME}_cpu64");
     }
 
     let bindings = bindgen::Builder::default()
@@ -51,24 +47,17 @@ fn main() {
 }
 
 fn build_static(build_dir: &Path) {
-    let status = Command::new("cmake")
-        .args(["-S", ".", "-B", build_dir.to_str().unwrap()])
+    let status = Command::new("make")
+        .arg("lib")
+        .env("BUILDDIR", build_dir)
         .current_dir(RVVM_PATH)
         .status()
-        .expect("Failed to spawn cmake command");
+        .expect("Failed to spawn make command");
 
     if !status.success() {
         panic!(
-            "Failed to build RVVM staticlib. Possibly cmake is not \
+            "Failed to build RVVM staticlib. Possibly make is not \
              installed"
         );
-    }
-    let status = Command::new("cmake")
-        .args(["--build", "."])
-        .current_dir(build_dir)
-        .status()
-        .expect("Failed to spawn cmake command");
-    if !status.success() {
-        panic!("Failed to build static lib RVVM");
     }
 }
