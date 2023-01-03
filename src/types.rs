@@ -1,36 +1,27 @@
-use std::marker::PhantomData;
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceHandle<T> {
-    pub(crate) id: i32,
+    pub(crate) inner: i32,
     phantom: PhantomData<T>,
 }
 
-impl<T> DeviceHandle<T> {
-    pub(crate) const fn new(id: i32) -> Self {
-        Self {
-            id,
-            phantom: PhantomData,
-        }
+impl<T> Debug for DeviceHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DeviceHandle")
+            .field(&self.inner)
+            .finish()
     }
 }
 
-crate::__ts_handler! {
-    name = TypeHandler,
-    raw = unsafe extern "C" fn(dev: *mut rvvm_sys::rvvm_mmio_dev_t)
-}
-
-crate::__ts_handler! {
-    name = RemoveHandler,
-    raw = RawTypeHandler
-}
-
-crate::__ts_handler! {
-    name = RwHandler,
-    raw = unsafe extern "C" fn(
-        dev: *mut rvvm_sys::rvvm_mmio_dev_t,
-        dest: *mut std::ffi::c_void,
-        offset: usize,
-        size: u8
-    ) -> bool
+impl<T> Copy for DeviceHandle<T> {}
+impl<T> Clone for DeviceHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner,
+            phantom: PhantomData,
+        }
+    }
 }

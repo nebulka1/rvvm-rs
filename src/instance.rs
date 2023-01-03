@@ -19,6 +19,7 @@ use rvvm_sys::{
     rvvm_load_kernel,
     rvvm_machine_powered_on,
     rvvm_machine_t,
+    rvvm_mmio_dev_t,
     rvvm_pause_machine,
     rvvm_read_ram,
     rvvm_start_machine,
@@ -28,7 +29,10 @@ use rvvm_sys::{
 
 use crate::{
     builders::instance::InstanceBuilder,
-    dev::mmio::Device,
+    dev::{
+        mmio::*,
+        type_::*,
+    },
     error::{
         DeviceAttachError,
         DtbDumpError,
@@ -38,11 +42,43 @@ use crate::{
         MemoryAccessError,
     },
     fdt::*,
-    types::DeviceHandle,
+    types::*,
 };
 
 pub struct Instance {
     ptr: NonNull<rvvm_machine_t>,
+}
+
+impl Instance {
+    pub fn try_attach_device<Ty, Dev>(
+        &mut self,
+        dev: Dev,
+    ) -> Result<DeviceHandle<Ty>, DeviceAttachError>
+    where
+        Ty: Send + Sync,
+        Dev: Device<Ty>,
+    {
+        // Dev is meant to be `repr(transparent)` to the
+        // `rvvm_mmio_dev_t`, and `Device<Ty>` also
+        // implements unsafe trait `DeviceData<Ty = Ty>`,
+        // so, we can assume that `Dev` and the
+        // `rvvm_mmio_dev_t` is same in the representation
+
+        union CopyCast<Src, Dst: Copy> {
+            src: mem::ManuallyDrop<Src>,
+            dst: Dst,
+        }
+
+        fn no_drop<T>(src: T) -> mem::ManuallyDrop<T> {
+            mem::ManuallyDrop::new(src)
+        }
+
+        let mut underlying = unsafe {
+            CopyCast::<Dev, rvvm_mmio_dev_t> { src: no_drop(dev) }.dst
+        };
+
+        todo!()
+    }
 }
 
 // FIXME: add correct error reporting
@@ -242,41 +278,6 @@ impl Instance {
 }
 
 impl Instance {
-    /// Get mutable reference to the RVVM's mmio device
-    pub fn get_device_mut<T: Send + Sync>(
-        &mut self,
-        handle: DeviceHandle<T>,
-    ) -> Option<&mut Device<T>> {
-        let dev = unsafe { rvvm_get_mmio(self.ptr.as_ptr(), handle.id) };
-
-        if dev.is_null() {
-            None
-        } else {
-            // SAFETY: dev != null and mutable reference can't be
-            // obtained twice because `&mut Device<T>` lifetime is
-            // bounded by the `self`
-            Some(unsafe { &mut *(dev as *mut Device<T>) })
-        }
-    }
-
-    /// Get immutable reference to the RVVM's mmio device
-    pub fn get_device<T: Send + Sync>(
-        &self,
-        handle: DeviceHandle<T>,
-    ) -> Option<&Device<T>> {
-        // SAFETY: self.ptr is valid rvvm machine ptr
-        let dev = unsafe { rvvm_get_mmio(self.ptr.as_ptr(), handle.id) };
-
-        if dev.is_null() {
-            None
-        } else {
-            // SAFETY: dev != null
-            Some(unsafe { &*(dev as *const Device<T>) })
-        }
-    }
-}
-
-impl Instance {
     pub fn powered_on(&self) -> bool {
         // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
         unsafe { rvvm_machine_powered_on(self.ptr.as_ptr()) }
@@ -302,36 +303,6 @@ impl Instance {
             Ok(())
         } else {
             Err(InstancePauseError::NotRunning)
-        }
-    }
-}
-
-impl Instance {
-    /// Tries to attach `Device<T>` to the paused virtual
-    /// machine.
-    ///
-    /// Possible results:
-    /// - `Ok(handle)`, returns typed device handle inside
-    ///   the virtual machine
-    /// - `Err(e)`, returns `DeviceAttachError` enum
-    pub fn try_attach_device<T: Send + Sync>(
-        &mut self,
-        mut device: Device<T>,
-    ) -> Result<DeviceHandle<T>, DeviceAttachError> {
-        device.inner.machine = self.ptr.as_ptr();
-
-        let handle = unsafe {
-            rvvm_attach_mmio(
-                self.ptr.as_ptr(),
-                &device as *const Device<_> as *const _,
-            )
-        };
-
-        std::mem::forget(device);
-
-        match handle {
-            h @ 0.. => Ok(DeviceHandle::new(h)),
-            _ => Err(DeviceAttachError::RegionIsOccupied),
         }
     }
 }
