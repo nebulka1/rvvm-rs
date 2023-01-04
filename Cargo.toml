@@ -14,9 +14,9 @@ repository = "https://github.com/RVVM-rs/rvvm"
 lto = true
 opt-level = 3
 
-# [[bin]]
-# name = "rvvmrs"
-# path = "bin/main.rs"
+[[bin]]
+name = "rvvmrs"
+path = "bin/main.rs"
 
 [workspace]
 members = ["packages/*"]

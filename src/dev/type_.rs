@@ -1,14 +1,17 @@
 use std::ffi::CStr;
 
-pub trait DeviceType {
-    type Device;
-
-    /// Get name of the device type
+/// Unsafe functions of the DeviceType
+///
+/// # Safety
+///
+/// This trait is meant to be unsafe due to internal
+/// implementation
+pub unsafe trait UnsafeDeviceType {
     fn name(&self) -> &CStr;
+}
 
-    /// Remove handler, called when device is being removed
-    /// from the instance
-    fn remove(&mut self, dev: &mut Self::Device);
+pub trait DeviceType: UnsafeDeviceType {
+    type Device;
 
     /// TODO
     fn reset(&mut self, dev: &mut Self::Device);
