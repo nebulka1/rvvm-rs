@@ -1,166 +1,106 @@
-use darling::FromMeta;
 use proc_macro::TokenStream;
-use proc_macro_error::*;
+use proc_macro2::Span;
+use proc_macro_error::{
+    abort,
+    proc_macro_error,
+};
 use quote::quote;
 use syn::{
-    AttributeArgs,
-    Ident,
-    ItemFn,
-    Signature,
-    Type,
+    punctuated::Punctuated,
+    Fields,
+    TypeTuple,
 };
 
-macro_rules! parse_fn {
-    ($attrs:expr, $stream:expr) => {
-        match parse_fn($attrs, $stream) {
-            Ok(tpl) => tpl,
-            Err(e) => return e,
-        }
-    };
-}
-
-#[derive(Debug, FromMeta)]
-struct MacroArgs {
-    pub ty: Type,
+fn unit() -> syn::Type {
+    syn::Type::Tuple(TypeTuple {
+        paren_token: syn::token::Paren {
+            span: Span::call_site(),
+        },
+        elems: Punctuated::new(),
+    })
 }
 
 #[proc_macro_attribute]
 #[proc_macro_error]
-pub fn type_handler(
-    attrs: TokenStream,
-    stream: TokenStream,
-) -> TokenStream {
-    let (args, mut item) = parse_fn!(attrs, stream);
+pub fn device(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
+    let dev = syn::parse_macro_input!(stream as syn::ItemStruct);
 
-    let ident = replace_ident(&mut item.sig, "__ty_handler");
-    let ty = args.ty;
+    let ident = dev.ident;
+    let vis = dev.vis;
+
+    let ty: syn::Type = match dev.fields {
+        Fields::Unit => unit(),
+        Fields::Unnamed(unnamed) => {
+            let mut it = unnamed.unnamed.iter();
+            let first = it.next();
+            let second = it.next();
+
+            match (first, second) {
+                (Some(field), None) => field.ty.clone(),
+                (None, None) => unit(),
+
+                _ => abort! {
+                    unnamed, "Struct must be tuple-like with single \
+                              field or unit-like or tuple-like with no fields"
+                },
+            }
+        }
+
+        fields @ Fields::Named(_) => abort! {
+            fields, "Device struct can only be created with the single unnamed field or without fields";
+            help = "Create unit or tuple-like structure with the single field"
+        },
+    };
+    let definition = quote! {
+        #[repr(transparent)]
+        #vis struct #ident {
+            inner: ::rvvm::types::UnsafeDevice<#ty>,
+        }
+    };
+
 
     quote! {
-        #[allow(non_upper_case_globals)]
-        static #ident : rvvm::types::TypeHandler<#ty> = {
-            #item
+        #definition
 
-            unsafe extern "C" fn __bind_ty(dev: *mut rvvm::ffi::rvvm_mmio_dev_t) {
-                let dev = &*(dev as *mut rvvm::dev::mmio::Device<#ty>);
-                __ty_handler(dev);
-            }
 
-            unsafe { rvvm::types::TypeHandler::<#ty>::new(__bind_ty) }
-        };
-    }.into()
-}
+        impl ::rvvm::dev::ext::DeviceExt for #ident {
+            type DataTy = #ty;
 
-/// Creates `DeviceType<T>` remove handler
-#[proc_macro_attribute]
-#[proc_macro_error]
-pub fn on_remove(attrs: TokenStream, stream: TokenStream) -> TokenStream {
-    let (args, mut item) = parse_fn!(attrs, stream);
+            fn new(
+                address: u64,
+                size: usize, // моя внимательность момент
+                op_size_range: ::core::ops::RangeInclusive<u8>,
+                data: Self::DataTy,
+            ) -> Self {
+                type Box<T> = ::std::boxed::Box<T>;
 
-    let ident = replace_ident(&mut item.sig, "__rm_fn");
-    let ty = args.ty;
+                let min_op_size = *op_size_range.start();
+                let max_op_size = *op_size_range.end();
 
-    quote! {
-        #[allow(non_upper_case_globals)]
-        static #ident : rvvm::types::RemoveHandler<#ty> = {
-            #item
+                let data_boxed: Box<Self::DataTy> = Box::new(data);
+                let data_voidptr: *mut ::core::ffi::c_void =
+                    unsafe { Box::into_raw(data_boxed) } as *mut () as *mut _;
+                
+                Self {
+                    inner: unsafe { ::rvvm::types::UnsafeDevice::<Self::DataTy>::new(
+                        ::rvvm::ffi::rvvm_mmio_dev_t {
+                            addr: address,
+                            size,
 
-            unsafe extern "C" fn __bind_fn(dev: *mut rvvm::ffi::rvvm_mmio_dev_t) {
-                {
-                    let dev = &mut *(dev as *mut rvvm::dev::mmio::Device<#ty>);
-                    __rm_fn(dev);
-                }
+                            min_op_size, max_op_size,
 
-                unsafe { rvvm::dev::type_::DeviceType::<#ty>::drop_glue(dev) };
-            }
+                            read: None,
+                            write: None,
 
-            unsafe { rvvm::types::RemoveHandler::<#ty>::new(__bind_fn) }
-        };
-    }.into()
-}
+                            data: data_voidptr,
 
-/// Creates type-safe RW Device Handle
-#[proc_macro_attribute]
-#[proc_macro_error]
-pub fn on_rw(attributes: TokenStream, stream: TokenStream) -> TokenStream {
-    let (args, mut item) = parse_fn!(attributes, stream);
-
-    let ident = replace_ident(&mut item.sig, "__inner_fn");
-    let ty = args.ty;
-
-    let output = quote! {
-        #[allow(non_upper_case_globals)]
-        static #ident : rvvm::types::RwHandler<#ty> = {
-            #item
-
-            unsafe extern "C" fn __bind_fn(
-                dev: *mut rvvm::ffi::rvvm_mmio_dev_t,
-                dest: *mut std::ffi::c_void,
-                offset: usize,
-                size: u8,
-            ) -> bool {
-                let dev = &*(dev as *mut Device<#ty>);
-
-                let slice: &'static mut [u8] = std::slice::from_raw_parts_mut(
-                    dest as *mut u8,
-                    dev.size()
-                );
-
-                if let Err(e) = __inner_fn(dev, slice, offset, size) {
-                    eprintln!("Device {} returned an error: {:?}", stringify!(#ident), e);
-                    false
-                } else {
-                    true
+                            machine: ::core::ptr::null_mut(),
+                            type_: ::core::ptr::null_mut(),
+                        }
+                    ) }
                 }
             }
-
-            unsafe { rvvm::types::RwHandler::<#ty>::new(__bind_fn) }
-        };
-    };
-
-    output.into()
-}
-
-fn parse_fn(
-    attrs: TokenStream,
-    stream: TokenStream,
-) -> Result<(MacroArgs, ItemFn), TokenStream> {
-    let args = syn::parse_macro_input::parse::<AttributeArgs>(attrs)
-        .expect_or_abort("Failed to parse attribute args");
-    let item = syn::parse_macro_input::parse::<ItemFn>(stream)
-        .expect_or_abort("Failed to parse function");
-
-    let args = match MacroArgs::from_list(&args) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e.write_errors().into());
-        }
-    };
-
-    if let Some(const_) = item.sig.constness {
-        abort! {
-            const_, "Handler can't be const";
-            help = "Remove const from function signature"
         }
     }
-    if let Some(abi) = item.sig.abi {
-        abort! {
-            abi, "Explicit ABI specification is not allowed";
-            help = "Remove explicit ABI from function signature"
-        }
-    }
-    if let Some(async_) = item.sig.asyncness {
-        abort! {
-            async_, "Async handlers are not supported";
-            help = "Remove async from function signature declaration"
-        }
-    }
-
-    Ok((args, item))
-}
-
-fn replace_ident(sig: &mut Signature, with: &str) -> Ident {
-    let prev = sig.ident.clone();
-    sig.ident = Ident::new(with, prev.span());
-
-    prev
+    .into()
 }
