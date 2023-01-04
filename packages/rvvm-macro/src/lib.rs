@@ -1,5 +1,9 @@
 use darling::FromMeta;
 use proc_macro::TokenStream;
+use proc_macro2::{
+    Span,
+    TokenStream as TokenStream2,
+};
 use proc_macro_error::*;
 use quote::quote;
 use syn::{
@@ -163,4 +167,95 @@ fn replace_ident(sig: &mut Signature, with: &str) -> Ident {
     sig.ident = Ident::new(with, prev.span());
 
     prev
+}
+
+#[proc_macro_attribute]
+#[proc_macro_error]
+pub fn device(
+    _attributes: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
+    let input = syn::parse_macro_input::parse::<syn::DeriveInput>(input)
+        .expect_or_abort("Failed to parse derive input");
+
+    let fields = match &input.data {
+        syn::Data::Struct(syn::DataStruct {
+            fields:
+                syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }),
+            ..
+        }) => unnamed,
+        _ => abort! {
+            input, "Device can only be derived for structs with a single unnamed field"
+        },
+    };
+    let field_ty = match fields.into_iter().collect::<Vec<_>>().as_slice()
+    {
+        [field] => field.ty.clone(),
+        _ => abort! {
+            input, "Device can only be derived for structs with a single unnamed field"
+        },
+    };
+
+    let ident = &input.ident;
+
+    quote! {
+        #[repr(transparent)]
+        struct #ident {
+            dev: rvvm_sys::rvvm_mmio_dev_t,
+        }
+
+        unsafe impl DeviceData for Uart {
+            type Ty = #field_ty;
+
+            fn data(&self) -> &Self::Ty {
+                unsafe { &*(self.dev.data as *const Self::Ty) }
+            }
+
+            fn data_mut(&mut self) -> &mut Self::Ty {
+                unsafe { &mut *(self.dev.data as *mut Self::Ty) }
+            }
+        }
+    }
+    .into()
+}
+
+#[proc_macro_derive(DeviceTypeExt)]
+#[proc_macro_error]
+pub fn device_type_ext(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input::parse::<syn::DeriveInput>(input)
+        .expect_or_abort("Failed to parse derive input");
+    let ty = input.ident;
+
+    let remove_impl = device_impl_func(&ty, "remove");
+    let update_impl = device_impl_func(&ty, "update");
+    let reset_impl = device_impl_func(&ty, "reset");
+    quote! {
+        unsafe impl DeviceTypeExt for #ty {
+            fn new() -> Self {
+                const q: rvvm::ffi::rvvm_mmio_type_t = {
+                    #remove_impl
+                    #update_impl
+                    #reset_impl
+                    rvvm::ffi::rvvm_mmio_type_t {
+                        remove: Some(remove),
+                        update: Some(update),
+                        reset: Some(reset),
+                        name: 0 as *const std::os::raw::c_char, // TODO
+                    }
+                };
+                Self(q)
+            }
+        }
+    }
+    .into()
+}
+
+fn device_impl_func(ty: &syn::Ident, func: &str) -> TokenStream2 {
+    let func = Ident::new(func, Span::call_site());
+    quote! {
+        unsafe extern "C" fn #func(dev: *mut rvvm::ffi::rvvm_mmio_dev_t) {
+            let dev = &mut *(dev as *mut <#ty as rvvm::dev::type_::DeviceType>::Device);
+            <#ty as rvvm::dev::type_::DeviceType>::#func(dev);
+        }
+    }
 }

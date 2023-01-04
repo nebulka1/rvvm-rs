@@ -8,11 +8,15 @@ pub trait DeviceType {
 
     /// Remove handler, called when device is being removed
     /// from the instance
-    fn remove(&mut self, dev: &mut Self::Device);
+    fn remove(_dev: &mut Self::Device) {}
 
     /// TODO
-    fn reset(&mut self, dev: &mut Self::Device);
+    fn reset(_dev: &mut Self::Device) {}
 
     /// TODO
-    fn update(&mut self, dev: &mut Self::Device);
+    fn update(_dev: &mut Self::Device) {}
+}
+
+pub unsafe trait DeviceTypeExt: DeviceType {
+    fn new() -> Self;
 }

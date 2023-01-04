@@ -8,6 +8,15 @@ pub struct DeviceHandle<T> {
     phantom: PhantomData<T>,
 }
 
+impl<T> DeviceHandle<T> {
+    pub(crate) fn new(inner: i32) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<T> Debug for DeviceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("DeviceHandle")

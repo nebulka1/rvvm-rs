@@ -13,7 +13,6 @@ use rvvm_sys::{
     rvvm_free_machine,
     rvvm_get_fdt_root,
     rvvm_get_fdt_soc,
-    rvvm_get_mmio,
     rvvm_load_bootrom,
     rvvm_load_dtb,
     rvvm_load_kernel,
@@ -29,10 +28,7 @@ use rvvm_sys::{
 
 use crate::{
     builders::instance::InstanceBuilder,
-    dev::{
-        mmio::*,
-        type_::*,
-    },
+    dev::mmio::*,
     error::{
         DeviceAttachError,
         DtbDumpError,
@@ -77,7 +73,14 @@ impl Instance {
             CopyCast::<Dev, rvvm_mmio_dev_t> { src: no_drop(dev) }.dst
         };
 
-        todo!()
+        let handle = unsafe {
+            rvvm_attach_mmio(self.ptr.as_ptr(), &mut underlying)
+        };
+
+        match handle {
+            h @ 0.. => Ok(DeviceHandle::new(h)),
+            _ => Err(DeviceAttachError::RegionIsOccupied),
+        }
     }
 }
 
