@@ -51,24 +51,31 @@ pub fn device(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
             help = "Create unit or tuple-like structure with the single field"
         },
     };
-    let definition = quote! {
+
+    quote! {
         #[repr(transparent)]
         #vis struct #ident {
             inner: ::rvvm::types::UnsafeDevice<#ty>,
         }
-    };
 
+        unsafe impl ::rvvm::dev::mmio::DeviceData for #ident {
+            type Ty = #ty;
 
-    quote! {
-        #definition
+            fn data(&self) -> &Self::Ty {
+                unsafe { self.inner.data() }
+            }
 
+            fn data_mut(&mut self) -> &mut Self::Ty {
+                unsafe { self.inner.data_mut() }
+            }
+        }
 
-        impl ::rvvm::dev::ext::DeviceExt for #ident {
+        impl ::rvvm::dev::mmio::DeviceExt for #ident {
             type DataTy = #ty;
 
             fn new(
                 address: u64,
-                size: usize, // моя внимательность момент
+                size: usize,
                 op_size_range: ::core::ops::RangeInclusive<u8>,
                 data: Self::DataTy,
             ) -> Self {
