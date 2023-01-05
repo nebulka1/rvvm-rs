@@ -1,5 +1,6 @@
 use std::{
     ffi::CString,
+    marker::PhantomData,
     mem,
     path::Path,
     ptr::NonNull,
@@ -9,6 +10,8 @@ use std::{
 use rvvm_sys::{
     rvvm_attach_mmio,
     rvvm_create_machine,
+    rvvm_create_user_thread,
+    rvvm_create_userland,
     rvvm_dump_dtb,
     rvvm_free_machine,
     rvvm_get_fdt_root,
@@ -29,6 +32,7 @@ use rvvm_sys::{
 
 use crate::{
     builders::instance::InstanceBuilder,
+    cpu_handle::CpuHandle,
     dev::{
         mmio::*,
         type_::*,
@@ -45,11 +49,30 @@ use crate::{
     types::*,
 };
 
-pub struct Instance {
+/// Marker that indicates that the machine is running in the
+/// standard context.
+pub enum Machine {}
+
+/// Marker that indicates that the machine is running in the
+/// userland context.
+pub enum Userland {}
+
+/// Trait that parameterizes over the machine context
+/// markers [`Machine`] and [`Userland`].
+pub trait InstanceKind: private::Sealed {}
+
+impl InstanceKind for Machine {}
+impl private::Sealed for Machine {}
+
+impl InstanceKind for Userland {}
+impl private::Sealed for Userland {}
+
+pub struct Instance<K: InstanceKind = Machine> {
     ptr: NonNull<rvvm_machine_t>,
+    _kind: std::marker::PhantomData<K>,
 }
 
-impl Instance {
+impl<K: InstanceKind> Instance<K> {
     pub fn try_attach_device<Ty, Dev>(
         &mut self,
         dev: Dev,
@@ -83,7 +106,7 @@ impl Instance {
 
 // FIXME: add correct error reporting
 // mainly this could be fixed by RVVM, I'll make PR to ti
-impl Instance {
+impl<K: InstanceKind> Instance<K> {
     pub fn try_dump_dtb(
         &mut self,
         dest: impl AsRef<Path>,
@@ -177,7 +200,7 @@ impl Instance {
     }
 }
 
-impl Instance {
+impl<K: InstanceKind> Instance<K> {
     /// Writes `data` to the machine's RAM
     ///
     /// - Returns `Ok` if data was successfully written
@@ -247,7 +270,7 @@ impl Instance {
     }
 }
 
-impl Instance {
+impl<K: InstanceKind> Instance<K> {
     /// Get mutable reference to the root FDT
     pub fn fdt_root_mut<'a>(&'a mut self) -> &'a mut Node {
         unsafe {
@@ -277,7 +300,7 @@ impl Instance {
     }
 }
 
-impl Instance {
+impl<K: InstanceKind> Instance<K> {
     pub fn powered_on(&self) -> bool {
         // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
         unsafe { rvvm_machine_powered_on(self.ptr.as_ptr()) }
@@ -307,7 +330,7 @@ impl Instance {
     }
 }
 
-impl Instance {
+impl Instance<Machine> {
     pub const DEFAULT_MEMBASE: u64 = RVVM_DEFAULT_MEMBASE as _;
 
     /// Creates the `InstanceBuilder` for the builder
@@ -331,7 +354,10 @@ impl Instance {
         NonNull::new(unsafe {
             rvvm_create_machine(mem_base, mem_size, harts, rv64)
         })
-        .map(|ptr| Self { ptr })
+        .map(|ptr| Self {
+            ptr,
+            _kind: PhantomData,
+        })
         .ok_or(InstanceCreateError::FailedToAllocate)
     }
 
@@ -355,10 +381,38 @@ impl Instance {
     }
 }
 
-impl Drop for Instance {
+impl Instance<Userland> {
+    pub fn try_new(rv64: bool) -> Result<Self, InstanceCreateError> {
+        NonNull::new(unsafe { rvvm_create_userland(rv64) })
+            .map(|ptr| Self {
+                ptr,
+                _kind: PhantomData,
+            })
+            .ok_or(InstanceCreateError::FailedToAllocate)
+    }
+
+    pub fn new(rv64: bool) -> Self {
+        Self::try_new(rv64)
+            .expect("Failed to allocate memory for the machine")
+    }
+}
+
+impl Instance<Userland> {
+    pub fn create_user_thread(&mut self) -> CpuHandle {
+        NonNull::new(unsafe { rvvm_create_user_thread(self.ptr.as_ptr()) })
+            .map(|ptr| CpuHandle { ptr })
+            .expect("Failed to create user thread")
+    }
+}
+
+impl<K: InstanceKind> Drop for Instance<K> {
     fn drop(&mut self) {
         // SAFETY: `self.ptr` is allocated through the
         // `rvvm_create_machine`
         unsafe { rvvm_free_machine(self.ptr.as_ptr()) }
     }
+}
+
+mod private {
+    pub trait Sealed {}
 }

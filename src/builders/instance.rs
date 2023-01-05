@@ -2,7 +2,10 @@ use rvvm_sys::RVVM_DEFAULT_MEMBASE;
 
 use crate::{
     error::InstanceCreateError,
-    instance::Instance,
+    instance::{
+        Instance,
+        Machine,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -16,8 +19,10 @@ pub struct InstanceBuilder {
 }
 
 impl InstanceBuilder {
-    pub fn try_build(self) -> Result<Instance, InstanceCreateError> {
-        Instance::try_new(
+    pub fn try_build(
+        self,
+    ) -> Result<Instance<Machine>, InstanceCreateError> {
+        Instance::<Machine>::try_new(
             self.harts,
             self.mem_base,
             self.mem_size,
@@ -25,8 +30,13 @@ impl InstanceBuilder {
         )
     }
 
-    pub fn build(self) -> Instance {
-        Instance::new(self.harts, self.mem_base, self.mem_size, self.rv64)
+    pub fn build(self) -> Instance<Machine> {
+        Instance::<Machine>::new(
+            self.harts,
+            self.mem_base,
+            self.mem_size,
+            self.rv64,
+        )
     }
 }
 
