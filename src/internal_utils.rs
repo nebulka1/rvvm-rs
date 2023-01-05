@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO: remove this code?
+
 use std::ffi::c_void;
 
 pub unsafe fn allocate_boxed_voidptr<T>(value: T) -> *mut c_void {

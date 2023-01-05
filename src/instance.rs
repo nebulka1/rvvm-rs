@@ -8,7 +8,6 @@ use std::{
 };
 
 use rvvm_sys::{
-    rvvm_attach_mmio,
     rvvm_create_machine,
     rvvm_create_user_thread,
     rvvm_create_userland,
@@ -16,7 +15,6 @@ use rvvm_sys::{
     rvvm_free_machine,
     rvvm_get_fdt_root,
     rvvm_get_fdt_soc,
-    rvvm_get_mmio,
     rvvm_load_bootrom,
     rvvm_load_dtb,
     rvvm_load_kernel,
@@ -33,10 +31,7 @@ use rvvm_sys::{
 use crate::{
     builders::instance::InstanceBuilder,
     cpu_handle::CpuHandle,
-    dev::{
-        mmio::*,
-        type_::*,
-    },
+    dev::mmio::*,
     error::{
         DeviceAttachError,
         DtbDumpError,
@@ -96,7 +91,7 @@ impl<K: InstanceKind> Instance<K> {
             mem::ManuallyDrop::new(src)
         }
 
-        let mut underlying = unsafe {
+        let mut _underlying = unsafe {
             CopyCast::<Dev, rvvm_mmio_dev_t> { src: no_drop(dev) }.dst
         };
 

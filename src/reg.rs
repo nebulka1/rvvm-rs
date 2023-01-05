@@ -9,7 +9,7 @@ use rvvm_sys::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(usize)]
 pub enum Register {
-    X0 = RVVM_REGID_X0 as usize + 0,
+    X0 = RVVM_REGID_X0 as usize,
     X1 = RVVM_REGID_X0 as usize + 1,
     X2 = RVVM_REGID_X0 as usize + 2,
     X3 = RVVM_REGID_X0 as usize + 3,
@@ -42,7 +42,7 @@ pub enum Register {
     X30 = RVVM_REGID_X0 as usize + 30,
     X31 = RVVM_REGID_X0 as usize + 31,
 
-    F0 = RVVM_REGID_F0 as usize + 0,
+    F0 = RVVM_REGID_F0 as usize,
     F1 = RVVM_REGID_F0 as usize + 1,
     F2 = RVVM_REGID_F0 as usize + 2,
     F3 = RVVM_REGID_F0 as usize + 3,

@@ -14,9 +14,9 @@ impl Device<i32> for TestDev {
 
     fn read(
         &self,
-        dest: &mut [u8],
-        size: u8,
-        offset: usize,
+        _dest: &mut [u8],
+        _size: u8,
+        _offset: usize,
     ) -> Result<(), Self::Error> {
         self.data();
         Ok(())
@@ -24,14 +24,14 @@ impl Device<i32> for TestDev {
 
     fn write(
         &self,
-        dest: &mut [u8],
-        size: u8,
-        offset: usize,
+        _dest: &mut [u8],
+        _size: u8,
+        _offset: usize,
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 fn main() {
-    let a = TestDev::new(10, 20, 1..=1, 1024i32);
+    let _a = TestDev::new(10, 20, 1..=1, 1024i32);
 }
