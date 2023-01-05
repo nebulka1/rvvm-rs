@@ -399,9 +399,10 @@ impl Instance<Userland> {
 
 impl Instance<Userland> {
     pub fn create_user_thread(&mut self) -> CpuHandle {
-        NonNull::new(unsafe { rvvm_create_user_thread(self.ptr.as_ptr()) })
-            .map(|ptr| CpuHandle { ptr })
-            .expect("Failed to create user thread")
+        CpuHandle::new(unsafe {
+            rvvm_create_user_thread(self.ptr.as_ptr())
+        })
+        .expect("Failed to create user thread")
     }
 }
 

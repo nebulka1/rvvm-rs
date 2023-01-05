@@ -1,25 +1,39 @@
 use std::{
     ffi::c_void,
+    marker::PhantomData,
     ptr::NonNull,
 };
 
-use rvvm_sys::rvvm_read_cpu_reg;
+use rvvm_sys::{
+    rvvm_cpu_handle_t,
+    rvvm_read_cpu_reg,
+};
 
 use crate::reg::Register;
 
-pub struct CpuHandle {
+pub struct CpuHandle<'a> {
     // TODO: indicate that this is rvvm_cpu_handle_t
-    pub(crate) ptr: NonNull<c_void>,
+    ptr: NonNull<c_void>,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl CpuHandle {
+impl CpuHandle<'_> {
+    pub(crate) fn new(ptr: rvvm_cpu_handle_t) -> Option<Self> {
+        Some(Self {
+            ptr: NonNull::new(ptr)?,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl CpuHandle<'_> {
     /// Run a userland thread until a trap happens. Returns
     /// trap cause.
     ///
     /// # Safety
     ///
-    /// This function is unsafe because the machine interacts
-    /// with host process memory directly.
+    /// This function is unsafe because the machine
+    /// interacts with host process memory directly.
     pub unsafe fn run(&mut self) -> u64 {
         unsafe { rvvm_sys::rvvm_run_user_thread(self.ptr.as_ptr()) }
     }
@@ -39,7 +53,7 @@ impl CpuHandle {
     }
 }
 
-impl Drop for CpuHandle {
+impl Drop for CpuHandle<'_> {
     fn drop(&mut self) {
         unsafe {
             rvvm_sys::rvvm_free_user_thread(self.ptr.as_ptr());
