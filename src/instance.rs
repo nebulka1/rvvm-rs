@@ -31,7 +31,7 @@ use rvvm_sys::{
 use crate::{
     builders::instance::InstanceBuilder,
     cpu_handle::CpuHandle,
-    dev::mmio::*,
+    dev::mmio::Device,
     error::{
         DeviceAttachError,
         DtbDumpError,
@@ -40,8 +40,8 @@ use crate::{
         InstanceStartError,
         MemoryAccessError,
     },
-    fdt::*,
-    types::*,
+    fdt::Node,
+    types::DeviceHandle,
 };
 
 /// Marker that indicates that the machine is running in the
