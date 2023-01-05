@@ -22,6 +22,11 @@ pub mod fdt;
 /// - Load dtb/kernel/bootrom
 pub mod instance;
 
+/// # CPU Handle
+pub mod cpu_handle;
+
+pub mod reg;
+
 /// # Device
 ///
 /// Anything that is related to the mmio devices. Refer to
