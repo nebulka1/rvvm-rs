@@ -24,6 +24,11 @@ pub unsafe trait DeviceData {
 pub trait Device<T>: DeviceData<Ty = T> {
     type Error;
 
+    const HAS_READ: bool = true;
+    const HAS_WRITE: bool = true;
+
+    // Device functions
+
     fn read(
         &self,
         dest: &mut [u8],
@@ -37,4 +42,11 @@ pub trait Device<T>: DeviceData<Ty = T> {
         size: u8,
         offset: usize,
     ) -> Result<(), Self::Error>;
+
+    // Type functions
+
+    fn name() -> &'static str;
+
+    fn reset(&mut self) {}
+    fn update(&mut self) {}
 }

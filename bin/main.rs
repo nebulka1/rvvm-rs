@@ -12,6 +12,10 @@ impl Drop for TestDev {
 impl Device<i32> for TestDev {
     type Error = ();
 
+    fn name() -> &'static str {
+        "123"
+    }
+
     fn read(
         &self,
         _dest: &mut [u8],
@@ -34,4 +38,5 @@ impl Device<i32> for TestDev {
 
 fn main() {
     let _a = TestDev::new(10, 20, 1..=1, 1024i32);
+    dbg!(TestDev::name());
 }

@@ -91,7 +91,7 @@ impl<K: InstanceKind> Instance<K> {
             mem::ManuallyDrop::new(src)
         }
 
-        let mut _underlying = unsafe {
+        let mut underlying = unsafe {
             CopyCast::<Dev, rvvm_mmio_dev_t> { src: no_drop(dev) }.dst
         };
 
