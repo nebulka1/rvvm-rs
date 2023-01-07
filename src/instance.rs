@@ -162,25 +162,13 @@ impl<K: InstanceKind> Instance<K> {
         {
             {
                 let dev = &mut *dev;
-                union EvilConstCast<Src> {
-                    src: *const Src,
-                    dst: *mut Src,
-                }
 
                 {
-                    let ty = EvilConstCast::<rvvm_mmio_type_t> {
-                        src: dev.type_,
-                    }
-                    .dst;
-                    let _ = CString::from_raw(
-                        EvilConstCast::<u8> { src: (*ty).name }.dst,
-                    );
+                    let ty = dev.type_ as *mut rvvm_mmio_type_t;
+                    let _ = CString::from_raw((*ty).name as *mut u8);
+                    let _ =
+                        Box::from_raw(dev.type_ as *mut rvvm_mmio_type_t);
                 }
-
-                let _ = Box::from_raw(
-                    EvilConstCast::<rvvm_mmio_type_t> { src: dev.type_ }
-                        .dst,
-                );
             }
 
             std::ptr::drop_in_place::<Dev>(dev as *mut () as *mut Dev);

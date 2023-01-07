@@ -1,3 +1,4 @@
+use integral_enum::IntegralEnum;
 use rvvm_sys::{
     RVVM_REGID_CAUSE,
     RVVM_REGID_F0,
@@ -6,7 +7,7 @@ use rvvm_sys::{
     RVVM_REGID_X0,
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(IntegralEnum)]
 #[repr(usize)]
 pub enum Register {
     X0 = RVVM_REGID_X0 as usize,
