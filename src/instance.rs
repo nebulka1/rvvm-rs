@@ -69,7 +69,7 @@ impl private::Sealed for Userland {}
 
 pub struct Instance<K: InstanceKind = Machine> {
     ptr: NonNull<rvvm_machine_t>,
-    _kind: std::marker::PhantomData<K>,
+    _kind: PhantomData<K>,
 }
 
 impl Instance<Machine> {
