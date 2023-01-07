@@ -14,10 +14,6 @@ repository = "https://github.com/RVVM-rs/rvvm"
 lto = true
 opt-level = 3
 
-[[bin]]
-name = "rvvmrs"
-path = "bin/main.rs"
-
 [workspace]
 members = ["packages/*"]
 
@@ -37,4 +33,3 @@ rvvm-macro = { version = "0.1.0", path = "packages/rvvm-macro" }
 integral-enum = { workspace = true }
 thiserror = { workspace = true }
 static_assertions = { workspace = true }
-paste = "1.0.11"
