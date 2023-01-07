@@ -72,7 +72,7 @@ pub struct Instance<K: InstanceKind = Machine> {
     _kind: std::marker::PhantomData<K>,
 }
 
-impl<K: InstanceKind> Instance<K> {
+impl Instance<Machine> {
     /// Try attach device to the RVVM.
     ///
     /// # Panics
@@ -201,7 +201,7 @@ impl<K: InstanceKind> Instance<K> {
 
 // FIXME: add correct error reporting
 // mainly this could be fixed by RVVM, I'll make PR to ti
-impl<K: InstanceKind> Instance<K> {
+impl Instance<Machine> {
     pub fn try_dump_dtb(
         &mut self,
         dest: impl AsRef<Path>,
@@ -365,7 +365,7 @@ impl<K: InstanceKind> Instance<K> {
     }
 }
 
-impl<K: InstanceKind> Instance<K> {
+impl Instance<Machine> {
     /// Get mutable reference to the root FDT
     pub fn fdt_root_mut<'a>(&'a mut self) -> &'a mut Node {
         unsafe {
@@ -395,7 +395,7 @@ impl<K: InstanceKind> Instance<K> {
     }
 }
 
-impl<K: InstanceKind> Instance<K> {
+impl Instance<Machine> {
     pub fn powered_on(&self) -> bool {
         // SAFETY: `self.ptr` is obtained from `rvvm_create_machine`
         unsafe { rvvm_machine_powered_on(self.ptr.as_ptr()) }
@@ -475,6 +475,10 @@ impl Instance<Machine> {
             .expect("Failed to allocate memory for the machine")
     }
 }
+
+//
+// Userland
+//
 
 impl Instance<Userland> {
     pub fn try_new(rv64: bool) -> Result<Self, InstanceCreateError> {
