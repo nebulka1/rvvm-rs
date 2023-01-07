@@ -37,6 +37,9 @@ impl Device<i32> for TestDev {
 }
 
 fn main() {
-    let _a = TestDev::new(10, 20, 1..=1, 1024i32);
-    dbg!(TestDev::name());
+    let mut instance = Instance::builder().build();
+    let test_dev = TestDev::new(10, 20, 1..=1, 1024i32);
+    let handle = instance.try_attach_device(test_dev);
+
+    dbg!(handle);
 }

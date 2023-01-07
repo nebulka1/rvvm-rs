@@ -1,5 +1,8 @@
 use std::{
-    ffi::CString,
+    ffi::{
+        c_void,
+        CString,
+    },
     marker::PhantomData,
     mem,
     path::Path,
@@ -8,6 +11,7 @@ use std::{
 };
 
 use rvvm_sys::{
+    rvvm_attach_mmio,
     rvvm_create_machine,
     rvvm_create_user_thread,
     rvvm_create_userland,
@@ -21,6 +25,7 @@ use rvvm_sys::{
     rvvm_machine_powered_on,
     rvvm_machine_t,
     rvvm_mmio_dev_t,
+    rvvm_mmio_type_t,
     rvvm_pause_machine,
     rvvm_read_ram,
     rvvm_start_machine,
@@ -68,6 +73,14 @@ pub struct Instance<K: InstanceKind = Machine> {
 }
 
 impl<K: InstanceKind> Instance<K> {
+    /// Try attach device to the RVVM.
+    ///
+    /// # Panics
+    ///
+    /// - if `Dev::HAS_READ` or `Dev::HAS_WRITE` are not
+    ///   true (FIXME)
+    /// - if `Dev::name()` returned string with the nul-byte
+    ///   terminator
     pub fn try_attach_device<Ty, Dev>(
         &mut self,
         dev: Dev,
@@ -82,6 +95,14 @@ impl<K: InstanceKind> Instance<K> {
         // so, we can assume that `Dev` and the
         // `rvvm_mmio_dev_t` is same in the representation
 
+        if !(Dev::HAS_READ && Dev::HAS_WRITE) {
+            panic!(
+                "FIXME: Validation of the data representation (Either \
+                 repr(C) struct or smth that is represented as a simple \
+                 u8 buffer)"
+            );
+        }
+
         union CopyCast<Src, Dst: Copy> {
             src: mem::ManuallyDrop<Src>,
             dst: Dst,
@@ -95,7 +116,98 @@ impl<K: InstanceKind> Instance<K> {
             CopyCast::<Dev, rvvm_mmio_dev_t> { src: no_drop(dev) }.dst
         };
 
-        todo!()
+        unsafe extern "C" fn rw_handler<Ty, Dev, const CALL_READ: bool>(
+            dev: *mut rvvm_mmio_dev_t,
+            dest: *mut c_void,
+            offset: usize,
+            size: u8,
+        ) -> bool
+        where
+            Ty: Send + Sync,
+            Dev: Device<Ty>,
+        {
+            let region_size = { (*dev).size };
+            let region =
+                slice::from_raw_parts_mut(dest as *mut u8, region_size);
+
+            let device = &*(dev as *const () as *const Dev);
+
+            if CALL_READ {
+                device.read(region, size, offset)
+            } else {
+                device.write(region, size, offset)
+            }
+            .is_ok()
+        }
+
+        unsafe extern "C" fn type_handler<
+            Ty: Send + Sync,
+            Dev: Device<Ty>,
+            const CALL_RESET: bool,
+        >(
+            dev: *mut rvvm_mmio_dev_t,
+        ) {
+            let dev = &mut *(dev as *mut () as *mut Dev);
+            if CALL_RESET {
+                dev.reset()
+            } else {
+                dev.update()
+            }
+        }
+
+        unsafe extern "C" fn drop_glue<Ty, Dev>(dev: *mut rvvm_mmio_dev_t)
+        where
+            Ty: Send + Sync,
+            Dev: Device<Ty>,
+        {
+            {
+                let dev = &mut *dev;
+                union EvilConstCast<Src> {
+                    src: *const Src,
+                    dst: *mut Src,
+                }
+
+                {
+                    let ty = EvilConstCast::<rvvm_mmio_type_t> {
+                        src: dev.type_,
+                    }
+                    .dst;
+                    let _ = CString::from_raw(
+                        EvilConstCast::<u8> { src: (*ty).name }.dst,
+                    );
+                }
+
+                let _ = Box::from_raw(
+                    EvilConstCast::<rvvm_mmio_type_t> { src: dev.type_ }
+                        .dst,
+                );
+            }
+
+            std::ptr::drop_in_place::<Dev>(dev as *mut () as *mut Dev);
+        }
+
+        underlying.read = Some(rw_handler::<_, Dev, true>);
+        underlying.write = Some(rw_handler::<_, Dev, false>);
+        underlying.machine = self.ptr.as_ptr();
+
+        let machine_type = Box::new(rvvm_mmio_type_t {
+            remove: Some(drop_glue::<_, Dev>),
+            update: Some(type_handler::<_, Dev, false>),
+            reset: Some(type_handler::<_, Dev, true>),
+            name: CString::new(Dev::name())
+                .expect("Name contains nul-byte terminator")
+                .into_raw(),
+        });
+
+        underlying.type_ = Box::into_raw(machine_type);
+        let handle = unsafe {
+            rvvm_attach_mmio(self.ptr.as_ptr(), &underlying as *const _)
+        };
+
+        match handle {
+            h @ 0.. => Ok(unsafe { DeviceHandle::<Ty>::from_raw(h) }),
+            _ => Err(DeviceAttachError::RegionIsOccupied),
+        }
     }
 }
 

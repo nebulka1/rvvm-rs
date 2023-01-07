@@ -45,6 +45,24 @@ pub struct DeviceHandle<T> {
     phantom: PhantomData<T>,
 }
 
+impl<T> DeviceHandle<T> {
+    /// Create handle that points to device with data `T`
+    ///
+    /// # Safety
+    ///
+    /// Unsafe due to possibility of violate the type safety
+    pub const unsafe fn from_raw(raw: i32) -> Self {
+        Self {
+            inner: raw,
+            phantom: PhantomData,
+        }
+    }
+
+    pub const fn raw(self) -> i32 {
+        self.inner
+    }
+}
+
 impl<T> Debug for DeviceHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("DeviceHandle")
