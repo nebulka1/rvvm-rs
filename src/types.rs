@@ -7,6 +7,22 @@ use rvvm_sys::rvvm_mmio_dev_t;
 
 use crate::dev::mmio::Device;
 
+/// Marker trait that indicates that type layout is
+/// specified
+pub unsafe trait KnownLayout {}
+
+unsafe impl KnownLayout for u8 {}
+unsafe impl KnownLayout for u16 {}
+unsafe impl KnownLayout for u32 {}
+unsafe impl KnownLayout for u64 {}
+
+unsafe impl KnownLayout for i8 {}
+unsafe impl KnownLayout for i16 {}
+unsafe impl KnownLayout for i32 {}
+unsafe impl KnownLayout for i64 {}
+
+unsafe impl<T, const N: usize> KnownLayout for [T; N] {}
+
 #[repr(transparent)]
 pub struct RawDevice<T: Send + Sync> {
     inner: rvvm_mmio_dev_t,

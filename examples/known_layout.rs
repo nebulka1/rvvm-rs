@@ -16,6 +16,9 @@ pub enum A {
 fn consume(_: impl KnownLayout) {}
 
 fn main() {
-    consume([Test; 10]);
-    consume([A::B { v: 20 }; 10]);
+    consume([1; 10]);
+    consume([A::B { v: 10 }; 10]);
+    consume([Test; 20]);
+    consume(Test);
+    consume(A::B { v: 30 });
 }
