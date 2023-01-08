@@ -21,7 +21,7 @@ unsafe impl KnownLayout for i16 {}
 unsafe impl KnownLayout for i32 {}
 unsafe impl KnownLayout for i64 {}
 
-unsafe impl<T, const N: usize> KnownLayout for [T; N] {}
+unsafe impl<T, const N: usize> KnownLayout for [T; N] where T: KnownLayout {}
 
 #[repr(transparent)]
 pub struct RawDevice<T: Send + Sync> {
