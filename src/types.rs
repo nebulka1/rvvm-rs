@@ -5,6 +5,8 @@ use std::{
 
 use rvvm_sys::rvvm_mmio_dev_t;
 
+use crate::dev::mmio::Device;
+
 #[repr(transparent)]
 pub struct RawDevice<T: Send + Sync> {
     inner: rvvm_mmio_dev_t,
@@ -31,6 +33,16 @@ impl<T: Send + Sync> RawDevice<T> {
             inner,
             phantom: PhantomData,
         }
+    }
+
+    pub unsafe fn upcast<Dev: Device<T>>(&self) -> &Dev {
+        // Device assumes #[repr(transparent)]
+        &*(&self.inner as *const _ as *const Dev)
+    }
+
+    pub unsafe fn upcast_mut<Dev: Device<T>>(&mut self) -> &mut Dev {
+        // Device assumes #[repr(transparent)]
+        &mut *(&mut self.inner as *mut _ as *mut Dev)
     }
 }
 
