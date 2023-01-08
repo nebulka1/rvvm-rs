@@ -19,6 +19,7 @@ use rvvm_sys::{
     rvvm_free_machine,
     rvvm_get_fdt_root,
     rvvm_get_fdt_soc,
+    rvvm_get_mmio,
     rvvm_load_bootrom,
     rvvm_load_dtb,
     rvvm_load_kernel,
@@ -46,7 +47,10 @@ use crate::{
         MemoryAccessError,
     },
     fdt::Node,
-    types::DeviceHandle,
+    types::{
+        DeviceHandle,
+        RawDevice,
+    },
 };
 
 /// Marker that indicates that the machine is running in the
@@ -73,6 +77,49 @@ pub struct Instance<K: InstanceKind = Machine> {
 }
 
 impl Instance<Machine> {
+    /// Retrieve raw ref to device by its handle
+    ///
+    /// Returns None if device does not exists
+    pub fn get_device<Ty>(
+        &self,
+        handle: DeviceHandle<Ty>,
+    ) -> Option<&RawDevice<Ty>>
+    where
+        Ty: Send + Sync,
+    {
+        Self::dev_get_impl(self.ptr, handle)
+            .map(|raw| unsafe { &*(raw as *const RawDevice<Ty>) })
+    }
+
+    /// Retrieve mutable raw ref to device by its handle
+    ///
+    /// Returns None if device does not exists
+    pub fn get_device_mut<Ty>(
+        &mut self,
+        handle: DeviceHandle<Ty>,
+    ) -> Option<&mut RawDevice<Ty>>
+    where
+        Ty: Send + Sync,
+    {
+        Self::dev_get_impl(self.ptr, handle)
+            .map(|raw| unsafe { &mut *(raw as *mut RawDevice<Ty>) })
+    }
+
+    fn dev_get_impl<Ty>(
+        ptr: NonNull<rvvm_machine_t>,
+        h: DeviceHandle<Ty>,
+    ) -> Option<*mut rvvm_mmio_dev_t>
+    where
+        Ty: Send + Sync,
+    {
+        let res = unsafe { rvvm_get_mmio(ptr.as_ptr(), h.inner) };
+        if res.is_null() {
+            None
+        } else {
+            Some(res)
+        }
+    }
+
     /// Try attach device to the RVVM.
     ///
     /// # Panics

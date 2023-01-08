@@ -55,7 +55,7 @@ pub fn device(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
     quote! {
         #[repr(transparent)]
         #vis struct #ident {
-            inner: ::rvvm::types::UnsafeDevice<#ty>,
+            inner: ::rvvm::types::RawDevice<#ty>,
         }
 
         unsafe impl ::rvvm::dev::mmio::DeviceData for #ident {
@@ -89,7 +89,7 @@ pub fn device(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
                     unsafe { Box::into_raw(data_boxed) } as *mut () as *mut _;
 
                 Self {
-                    inner: unsafe { ::rvvm::types::UnsafeDevice::<Self::DataTy>::new(
+                    inner: unsafe { ::rvvm::types::RawDevice::<Self::DataTy>::new(
                         ::rvvm::ffi::rvvm_mmio_dev_t {
                             addr: address,
                             size,

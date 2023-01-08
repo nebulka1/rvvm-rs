@@ -5,12 +5,13 @@ use std::{
 
 use rvvm_sys::rvvm_mmio_dev_t;
 
-pub struct UnsafeDevice<T: Send + Sync> {
+#[repr(transparent)]
+pub struct RawDevice<T: Send + Sync> {
     inner: rvvm_mmio_dev_t,
     phantom: PhantomData<T>,
 }
 
-impl<T: Send + Sync> UnsafeDevice<T> {
+impl<T: Send + Sync> RawDevice<T> {
     pub fn data(&self) -> &T {
         unsafe { &*(self.inner.data as *const () as *const T) }
     }
@@ -33,7 +34,7 @@ impl<T: Send + Sync> UnsafeDevice<T> {
     }
 }
 
-impl<T: Send + Sync> Drop for UnsafeDevice<T> {
+impl<T: Send + Sync> Drop for RawDevice<T> {
     fn drop(&mut self) {
         let _ =
             unsafe { Box::from_raw(self.inner.data as *mut () as *mut T) };
